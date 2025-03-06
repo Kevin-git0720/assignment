@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Product Details - Shopping Website</title>
+    <style>
+        body {
+            font-family: Arial;
+            margin: 20px;
+        }
+
+        .container {
+            width: 1000px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+        }
+
+        .nav-menu {
+            margin: 10px 0;
+            padding: 10px;
+            background: #eee;
+        }
+
+        .nav-menu a {
+            color: blue;
+            text-decoration: none;
+        }
+
+        .product-details {
+            display: flex;
+            padding: 20px;
+        }
+
+        .product-image {
+            width: 500px;
+        }
+
+        .product-image img {
+            width: 100%;
+            height: auto;
+        }
+
+        .product-info {
+            margin-left: 20px;
+        }
+
+        .product-title {
+            font-size: 24px;
+            margin: 10px 0;
+        }
+
+        .product-price {
+            font-size: 20px;
+            color: red;
+            font-weight: bold;
+        }
+
+        .product-description {
+            margin: 10px 0;
+        }
+
+        .add-to-cart {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+
+        .add-to-cart:hover {
+            background-color: #45a049;
+        }
+
+        .quantity-controls {
+            margin: 10px 0;
+        }
+
+        .quantity-controls button {
+            background: #eee;
+            border: none;
+            padding: 3px 8px;
+            cursor: pointer;
+        }
+
+        .quantity-controls button:hover {
+            background: #ddd;
+        }
+
+        .error-message {
+            color: red;
+            padding: 10px;
+            background: #fee;
+        }
+
+        .shopping-cart {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            background: white;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+
+        .cart-items-container {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .shopping-cart:hover .cart-items-container {
+            max-height: 500px;
+        }
+
+        .cart-item {
+            border-bottom: 1px solid #ccc;
+            padding: 10px;
+            margin: 5px 0;
+        }
+
+        .cart-item-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .cart-item-details h4 {
+            margin: 0;
+            flex: 1;
+        }
+
+        .cart-item-details p {
+            margin: 0 10px;
+        }
+
+        .quantity-controls {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        #cartTotal {
+            text-align: right;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav-menu" id="navMenu">
+            <a href="index.html">Home</a>
+        </nav>
+
+        <div id="productDetails">
+            <!-- Product details will be loaded dynamically -->
+        </div>
+    </div>
+
+    <div class="shopping-cart">
+        <h3>Shopping Cart</h3>
+        <div class="cart-items-container">
+            <div id="cartItems">
+                <div class="empty-cart">Your cart is empty</div>
+            </div>
+        </div>
+        <div id="cartTotal">Total: $0.00</div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://20.189.115.243:8081/api';
+        let cart = JSON.parse(localStorage.getItem('cart')) || {};
+
+        // Get product ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const pid = urlParams.get('pid');
+
+        // Load product details
+        async function loadProductDetails() {
+            try {
+                if (!pid) {
+                    throw new Error('Product ID not provided');
+                }
+
+                const response = await fetch(`${API_BASE_URL}/products/${pid}`);
+                const product = await response.json();
+
+                // Update navigation
+                document.getElementById('navMenu').innerHTML = `
+                    <a href="index.html">Home</a> &gt;
+                    <span>${product.name}</span>
+                `;
+
+                // Update product details
+                document.getElementById('productDetails').innerHTML = `
+                    <div class="product-details">
+                        <div class="product-image">
+                            <img src="${product.image_path}" alt="${product.name}">
+                        </div>
+                        <div class="product-info">
+                            <h1 class="product-title">${product.name}</h1>
+                            <div class="product-price">$${product.price}</div>
+                            <p class="product-description">${product.description}</p>
+                            <div class="quantity-controls">
+                                <button onclick="updateQuantity(-1)">-</button>
+                                <span id="quantity">1</span>
+                                <button onclick="updateQuantity(1)">+</button>
+                            </div>
+                            <button class="add-to-cart" onclick="addToCart(${JSON.stringify(product).replace(/"/g, '&quot;')})">
+                                Add to Cart
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Failed to load product details:', error);
+                document.getElementById('productDetails').innerHTML = `
+                    <div class="error-message">
+                        Failed to load product details. Please try again later.
+                    </div>
+                `;
+            }
+        }
+
+        // Update quantity
+        function updateQuantity(change) {
+            const quantityElement = document.getElementById('quantity');
+            let quantity = parseInt(quantityElement.textContent);
+            quantity = Math.max(1, quantity + change);
+            quantityElement.textContent = quantity;
+        }
+
+        // Add to cart
+        function addToCart(product) {
+            const quantity = parseInt(document.getElementById('quantity').textContent);
+            
+            if (!cart[product.pid]) {
+                cart[product.pid] = {
+                    ...product,
+                    quantity: 0
+                };
+            }
+            cart[product.pid].quantity += quantity;
+            
+            // Save cart to localStorage
+            localStorage.setItem('cart', JSON.stringify(cart));
+            
+            // Update cart display
+            updateCart();
+            
+            // Show success message
+            alert(`Added ${quantity} item(s) to cart`);
+        }
+
+        // Update cart display
+        function updateCart() {
+            const cartItems = document.getElementById('cartItems');
+            const items = Object.values(cart);
+            
+            if (items.length === 0) {
+                cartItems.innerHTML = '<div class="empty-cart">Your cart is empty</div>';
+                document.getElementById('cartTotal').textContent = 'Total: $0.00';
+                return;
+            }
+            
+            cartItems.innerHTML = items.map(item => `
+                <div class="cart-item">
+                    <div class="cart-item-details">
+                        <h4>${item.name}</h4>
+                        <p>$${item.price}</p>
+                        <div class="quantity-controls">
+                            <button onclick="updateCartQuantity(${item.pid}, -1)">-</button>
+                            <span>${item.quantity}</span>
+                            <button onclick="updateCartQuantity(${item.pid}, 1)">+</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+            document.getElementById('cartTotal').textContent = `Total: $${total.toFixed(2)}`;
+        }
+
+        // Update cart item quantity
+        function updateCartQuantity(pid, change) {
+            if (!cart[pid]) return;
+            
+            cart[pid].quantity += change;
+            if (cart[pid].quantity <= 0) {
+                delete cart[pid];
+            }
+            
+            localStorage.setItem('cart', JSON.stringify(cart));
+            updateCart();
+        }
+
+        // Initialize
+        loadProductDetails();
+        updateCart();
+    </script>
+</body>
+</html> 

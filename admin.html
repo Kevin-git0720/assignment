@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Panel - Shopping Website</title>
+    <style>
+        body {
+            font-family: Arial;
+            margin: 20px;
+        }
+
+        .container {
+            width: 1000px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+        }
+
+        .section {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+
+        h1, h2 {
+            color: #000;
+        }
+
+        .form-group {
+            margin: 10px 0;
+        }
+
+        label {
+            display: block;
+            margin: 5px 0;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        textarea,
+        select {
+            width: 300px;
+            padding: 5px;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .delete-btn {
+            background-color: #ff0000;
+        }
+
+        .delete-btn:hover {
+            background-color: #cc0000;
+        }
+
+        .edit-btn {
+            background-color: #0000ff;
+        }
+
+        .edit-btn:hover {
+            background-color: #0000cc;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 8px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        .preview-image {
+            width: 100px;
+            height: 100px;
+        }
+
+        .error-message {
+            color: red;
+            font-size: 12px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Admin Panel</h1>
+        
+        <div class="section">
+            <h2>Category Management</h2>
+            <form id="categoryForm">
+                <div class="form-group">
+                    <label for="categoryName">Category Name:</label>
+                    <input type="text" id="categoryName" required>
+                </div>
+                <button type="submit">Add Category</button>
+            </form>
+            <div class="table-title">Categories</div>
+            <div id="categoriesList"></div>
+        </div>
+
+        <div class="section">
+            <h2>Product Management</h2>
+            <form id="productForm">
+                <div class="form-group">
+                    <label for="productCategory">Category:</label>
+                    <select id="productCategory" required></select>
+                </div>
+                <div class="form-group">
+                    <label for="productName">Product Name:</label>
+                    <input type="text" id="productName" required minlength="2" maxlength="100">
+                    <div class="error-message" id="productNameError">Product name must be between 2 and 100 characters</div>
+                </div>
+                <div class="form-group">
+                    <label for="productPrice">Price:</label>
+                    <input type="number" id="productPrice" step="0.01" required min="0" max="1000000">
+                    <div class="error-message" id="productPriceError">Price must be between 0 and 1,000,000</div>
+                </div>
+                <div class="form-group">
+                    <label for="productDescription">Description:</label>
+                    <textarea id="productDescription" required minlength="10" maxlength="1000"></textarea>
+                    <div class="error-message" id="productDescriptionError">Description must be between 10 and 1000 characters</div>
+                </div>
+                <div class="form-group">
+                    <label for="productImage">Image</label>
+                    <input type="file" id="productImage" accept="image/jpeg,image/png,image/gif" required>
+                    <div class="error-message" id="productImageError">Please select a valid image file (JPG/PNG/GIF) under 10MB</div>
+                </div>
+                <button type="submit">Add Product</button>
+            </form>
+            <div class="table-title">Products</div>
+            <div id="productsList"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://20.189.115.243:8081/api';
+
+        async function loadCategories() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/categories`);
+                const categories = await response.json();
+                
+                const categorySelect = document.getElementById('productCategory');
+                categorySelect.innerHTML = categories.map(cat => 
+                    `<option value="${cat.catid}">${cat.name}</option>`
+                ).join('');
+
+                const categoriesList = document.getElementById('categoriesList');
+                categoriesList.innerHTML = `
+                    <table>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Actions</th>
+                        </tr>
+                        ${categories.map(cat => `
+                            <tr>
+                                <td>${cat.catid}</td>
+                                <td>${cat.name}</td>
+                                <td>
+                                    <button class="edit-btn" onclick="editCategory(${cat.catid}, '${cat.name}')">Edit</button>
+                                    <button class="delete-btn" onclick="deleteCategory(${cat.catid})">Delete</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </table>
+                `;
+            } catch (error) {
+                console.error('Failed to load categories:', error);
+            }
+        }
+
+        async function loadProducts() {
+            try {
+                const categoriesResponse = await fetch(`${API_BASE_URL}/categories`);
+                const categories = await categoriesResponse.json();
+                
+                let allProducts = [];
+                for (const category of categories) {
+                    const response = await fetch(`${API_BASE_URL}/products/category/${category.catid}`);
+                    const products = await response.json();
+                    allProducts = [...allProducts, ...products];
+                }
+
+                const productsList = document.getElementById('productsList');
+                productsList.innerHTML = `
+                    <table>
+                        <tr>
+                            <th>Image</th>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th>Price</th>
+                            <th>Actions</th>
+                        </tr>
+                        ${allProducts.map(product => `
+                            <tr>
+                                <td>
+                                    ${product.thumbnail_path ? 
+                                        `<img src="${product.thumbnail_path.replace(API_BASE_URL, '')}" class="preview-image" alt="${product.name}">` : 
+                                        'No image'}
+                                </td>
+                                <td>${product.name}</td>
+                                <td>${categories.find(c => c.catid === product.catid)?.name || 'Unknown category'}</td>
+                                <td>$${product.price}</td>
+                                <td>
+                                    <button class="edit-btn" onclick="editProduct(${product.pid})">Edit</button>
+                                    <button class="delete-btn" onclick="deleteProduct(${product.pid})">Delete</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </table>
+                `;
+            } catch (error) {
+                console.error('Failed to load products:', error);
+            }
+        }
+
+        document.getElementById('categoryForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('categoryName').value;
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/categories`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name })
+                });
+
+                if (response.ok) {
+                    document.getElementById('categoryName').value = '';
+                    loadCategories();
+                } else {
+                    const error = await response.json();
+                    alert(error.message);
+                }
+            } catch (error) {
+                console.error('Failed to add category:', error);
+                alert('Failed to add category');
+            }
+        });
+
+        function validateProductForm() {
+            let isValid = true;
+            const name = document.getElementById('productName');
+            const price = document.getElementById('productPrice');
+            const description = document.getElementById('productDescription');
+            const image = document.getElementById('productImage');
+
+            if (name.value.length < 2 || name.value.length > 100) {
+                document.getElementById('productNameError').style.display = 'block';
+                isValid = false;
+            } else {
+                document.getElementById('productNameError').style.display = 'none';
+            }
+
+            if (price.value < 0 || price.value > 1000000) {
+                document.getElementById('productPriceError').style.display = 'block';
+                isValid = false;
+            } else {
+                document.getElementById('productPriceError').style.display = 'none';
+            }
+
+            if (description.value.length < 10 || description.value.length > 1000) {
+                document.getElementById('productDescriptionError').style.display = 'block';
+                isValid = false;
+            } else {
+                document.getElementById('productDescriptionError').style.display = 'none';
+            }
+
+            if (image.files.length > 0) {
+                const file = image.files[0];
+                const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
+                const maxSize = 10 * 1024 * 1024;
+
+                if (!validTypes.includes(file.type) || file.size > maxSize) {
+                    document.getElementById('productImageError').style.display = 'block';
+                    isValid = false;
+                } else {
+                    document.getElementById('productImageError').style.display = 'none';
+                }
+            }
+
+            return isValid;
+        }
+
+        document.getElementById('productForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!validateProductForm()) {
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('catid', document.getElementById('productCategory').value);
+            formData.append('name', document.getElementById('productName').value);
+            formData.append('price', document.getElementById('productPrice').value);
+            formData.append('description', document.getElementById('productDescription').value);
+            
+            const imageFile = document.getElementById('productImage').files[0];
+            if (imageFile) {
+                const timestamp = Date.now();
+                const fileName = imageFile.name.replace(/[^a-zA-Z0-9.]/g, '-').toLowerCase();
+                const newFileName = `${fileName.split('.')[0]}-${timestamp}.${fileName.split('.').pop()}`;
+                formData.append('image', imageFile, newFileName);
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/products`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    document.getElementById('productForm').reset();
+                    loadProducts();
+                    alert('Product added successfully!');
+                } else {
+                    const error = await response.json();
+                    alert(error.message);
+                }
+            } catch (error) {
+                console.error('Failed to add product:', error);
+                alert('Failed to add product');
+            }
+        });
+
+        async function deleteCategory(catid) {
+            if (!confirm('Are you sure you want to delete this category?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/categories/${catid}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadCategories();
+                } else {
+                    const error = await response.json();
+                    alert(error.message);
+                }
+            } catch (error) {
+                console.error('Failed to delete category:', error);
+                alert('Failed to delete category');
+            }
+        }
+
+        async function deleteProduct(pid) {
+            if (!confirm('Are you sure you want to delete this product?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/products/${pid}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadProducts();
+                } else {
+                    const error = await response.json();
+                    alert(error.message);
+                }
+            } catch (error) {
+                console.error('Failed to delete product:', error);
+                alert('Failed to delete product');
+            }
+        }
+
+        async function editCategory(catid, currentName) {
+            const newName = prompt('Enter new category name:', currentName);
+            if (!newName) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/categories/${catid}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name: newName })
+                });
+
+                if (response.ok) {
+                    loadCategories();
+                } else {
+                    const error = await response.json();
+                    alert(error.message);
+                }
+            } catch (error) {
+                console.error('Failed to update category:', error);
+                alert('Failed to update category');
+            }
+        }
+
+        async function editProduct(pid) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/products/${pid}`);
+                const product = await response.json();
+                
+                const editForm = document.createElement('div');
+                editForm.innerHTML = `
+                    <div class="form-group">
+                        <label>Category:</label>
+                        <select id="editProductCategory" required>
+                            ${document.getElementById('productCategory').innerHTML}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Name:</label>
+                        <input type="text" id="editProductName" value="${product.name}" required minlength="2" maxlength="100">
+                        <div class="error-message" id="editProductNameError">Product name must be between 2 and 100 characters</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Price:</label>
+                        <input type="number" id="editProductPrice" step="0.01" value="${product.price}" required min="0" max="1000000">
+                        <div class="error-message" id="editProductPriceError">Price must be between 0 and 1,000,000</div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description:</label>
+                        <textarea id="editProductDescription" required minlength="10" maxlength="1000">${product.description}</textarea>
+                        <div class="error-message" id="editProductDescriptionError">Description must be between 10 and 1000 characters</div>
+                    </div>
+                    <div class="form-group">
+                        <label>New Image (Optional, JPG/GIF/PNG, max 10MB):</label>
+                        <input type="file" id="editProductImage" accept="image/jpeg,image/png,image/gif">
+                        <div class="error-message" id="editProductImageError">Please select a valid image file (JPG/PNG/GIF) under 10MB</div>
+                    </div>
+                `;
+
+                const result = confirm('Do you want to edit this product?');
+                if (!result) return;
+
+                if (!validateEditForm()) {
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('catid', document.getElementById('editProductCategory').value);
+                formData.append('name', document.getElementById('editProductName').value);
+                formData.append('price', document.getElementById('editProductPrice').value);
+                formData.append('description', document.getElementById('editProductDescription').value);
+                
+                const imageFile = document.getElementById('editProductImage').files[0];
+                if (imageFile) {
+                    const timestamp = Date.now();
+                    const fileName = imageFile.name.replace(/[^a-zA-Z0-9.]/g, '-').toLowerCase();
+                    const newFileName = `${fileName.split('.')[0]}-${timestamp}.${fileName.split('.').pop()}`;
+                    formData.append('image', imageFile, newFileName);
+                }
+
+                const updateResponse = await fetch(`${API_BASE_URL}/products/${pid}`, {
+                    method: 'PUT',
+                    body: formData
+                });
+
+                if (updateResponse.ok) {
+                    loadProducts();
+                    alert('Product updated successfully!');
+                } else {
+                    const error = await updateResponse.json();
+                    alert(error.message);
+                }
+            } catch (error) {
+                console.error('Failed to update product:', error);
+                alert('Failed to update product');
+            }
+        }
+
+        function validateEditForm() {
+            let isValid = true;
+            const name = document.getElementById('editProductName');
+            const price = document.getElementById('editProductPrice');
+            const description = document.getElementById('editProductDescription');
+            const image = document.getElementById('editProductImage');
+
+            if (name.value.length < 2 || name.value.length > 100) {
+                document.getElementById('editProductNameError').style.display = 'block';
+                isValid = false;
+            } else {
+                document.getElementById('editProductNameError').style.display = 'none';
+            }
+
+            if (price.value < 0 || price.value > 1000000) {
+                document.getElementById('editProductPriceError').style.display = 'block';
+                isValid = false;
+            } else {
+                document.getElementById('editProductPriceError').style.display = 'none';
+            }
+
+            if (description.value.length < 10 || description.value.length > 1000) {
+                document.getElementById('editProductDescriptionError').style.display = 'block';
+                isValid = false;
+            } else {
+                document.getElementById('editProductDescriptionError').style.display = 'none';
+            }
+
+            if (image.files.length > 0) {
+                const file = image.files[0];
+                const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
+                const maxSize = 10 * 1024 * 1024;
+
+                if (!validTypes.includes(file.type) || file.size > maxSize) {
+                    document.getElementById('editProductImageError').style.display = 'block';
+                    isValid = false;
+                } else {
+                    document.getElementById('editProductImageError').style.display = 'none';
+                }
+            }
+
+            return isValid;
+        }
+
+        loadCategories();
+        loadProducts();
+    </script>
+</body>
+</html> 
