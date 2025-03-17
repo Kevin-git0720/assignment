@@ -3,51 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <title>Admin Panel - Shopping Website</title>
+    <!-- 添加 nonce 支持 -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'nonce-random123'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http://20.189.115.243:8081; connect-src 'self' http://20.189.115.243:8081;">
     <style>
         body {
-            font-family: Arial;
+            font-family: Arial, sans-serif;
             margin: 20px;
+            background-color: #f4f4f4;
         }
 
         .container {
-            width: 1000px;
+            max-width: 1200px;
             margin: 0 auto;
-            background-color: #fff;
+            background-color: white;
             padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logout-btn {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .logout-btn:hover {
+            background-color: #d32f2f;
         }
 
         .section {
-            margin: 20px 0;
-            padding: 10px;
-            border: 1px solid #ccc;
+            margin-bottom: 30px;
         }
 
-        h1, h2 {
-            color: #000;
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
         }
 
         .form-group {
-            margin: 10px 0;
+            margin-bottom: 15px;
         }
 
         label {
             display: block;
-            margin: 5px 0;
+            margin-bottom: 5px;
+            color: #666;
         }
 
         input[type="text"],
         input[type="number"],
         textarea,
         select {
-            width: 300px;
-            padding: 5px;
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
         }
 
         button {
             background-color: #4CAF50;
             color: white;
-            padding: 5px 10px;
             border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
             cursor: pointer;
         }
 
@@ -55,303 +92,581 @@
             background-color: #45a049;
         }
 
+        .list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .list-item:last-child {
+            border-bottom: none;
+        }
+
         .delete-btn {
-            background-color: #ff0000;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
         }
 
         .delete-btn:hover {
-            background-color: #cc0000;
-        }
-
-        .edit-btn {
-            background-color: #0000ff;
-        }
-
-        .edit-btn:hover {
-            background-color: #0000cc;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            padding: 8px;
-            border: 1px solid #ddd;
-            text-align: left;
-        }
-
-        .preview-image {
-            width: 100px;
-            height: 100px;
+            background-color: #d32f2f;
         }
 
         .error-message {
-            color: red;
-            font-size: 12px;
+            color: #f44336;
+            margin-top: 5px;
+            font-size: 0.875rem;
             display: none;
+        }
+
+        .success-message {
+            color: #4CAF50;
+            margin-top: 5px;
+            font-size: 0.875rem;
+            display: none;
+        }
+
+        .category-header {
+            background-color: #f8f9fa;
+            padding: 10px;
+            margin-top: 15px;
+            font-weight: bold;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .product-info {
+            display: flex;
+            align-items: start;
+            gap: 15px;
+            flex: 1;
+        }
+
+        .product-image {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .no-image {
+            width: 100px;
+            height: 100px;
+            background-color: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            color: #666;
+        }
+
+        .product-details {
+            flex: 1;
+        }
+
+        .product-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .edit-btn {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .edit-btn:hover {
+            background-color: #1976D2;
+        }
+
+        .category-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .category-actions {
+            display: flex;
+            gap: 10px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Admin Panel</h1>
-        
+        <div class="header">
+            <h1>Admin Panel</h1>
+            <div class="user-info">
+                <span id="userEmail">Loading...</span>
+                <button class="logout-btn" id="logoutBtn">Logout</button>
+            </div>
+        </div>
+
         <div class="section">
-            <h2>Category Management</h2>
+            <h2>Add Category</h2>
             <form id="categoryForm">
                 <div class="form-group">
                     <label for="categoryName">Category Name:</label>
                     <input type="text" id="categoryName" required>
+                    <div class="error-message" id="categoryNameError"></div>
                 </div>
                 <button type="submit">Add Category</button>
+                <div class="success-message" id="categorySuccess"></div>
             </form>
-            <div class="table-title">Categories</div>
-            <div id="categoriesList"></div>
         </div>
 
         <div class="section">
-            <h2>Product Management</h2>
+            <h2>Add Product</h2>
             <form id="productForm">
                 <div class="form-group">
-                    <label for="productCategory">Category:</label>
-                    <select id="productCategory" required></select>
-                </div>
-                <div class="form-group">
                     <label for="productName">Product Name:</label>
-                    <input type="text" id="productName" required minlength="2" maxlength="100">
-                    <div class="error-message" id="productNameError">Product name must be between 2 and 100 characters</div>
+                    <input type="text" id="productName" required>
+                    <div class="error-message" id="productNameError"></div>
                 </div>
                 <div class="form-group">
                     <label for="productPrice">Price:</label>
-                    <input type="number" id="productPrice" step="0.01" required min="0" max="1000000">
-                    <div class="error-message" id="productPriceError">Price must be between 0 and 1,000,000</div>
+                    <input type="number" id="productPrice" step="0.01" required>
+                    <div class="error-message" id="productPriceError"></div>
                 </div>
                 <div class="form-group">
                     <label for="productDescription">Description:</label>
-                    <textarea id="productDescription" required minlength="10" maxlength="1000"></textarea>
-                    <div class="error-message" id="productDescriptionError">Description must be between 10 and 1000 characters</div>
+                    <textarea id="productDescription" required></textarea>
+                    <div class="error-message" id="productDescriptionError"></div>
                 </div>
                 <div class="form-group">
-                    <label for="productImage">Image</label>
-                    <input type="file" id="productImage" accept="image/jpeg,image/png,image/gif" required>
-                    <div class="error-message" id="productImageError">Please select a valid image file (JPG/PNG/GIF) under 10MB</div>
+                    <label for="productCategory">Category:</label>
+                    <select id="productCategory" required>
+                        <option value="">Select a category</option>
+                    </select>
+                    <div class="error-message" id="productCategoryError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="productImage">Image:</label>
+                    <input type="file" id="productImage" accept="image/*" required>
+                    <div class="error-message" id="productImageError"></div>
                 </div>
                 <button type="submit">Add Product</button>
+                <div class="success-message" id="productSuccess"></div>
             </form>
-            <div class="table-title">Products</div>
-            <div id="productsList"></div>
+        </div>
+
+        <div class="section">
+            <h2>Categories</h2>
+            <ul id="categoryList" class="list"></ul>
+        </div>
+
+        <div class="section">
+            <h2>Products</h2>
+            <ul id="productList" class="list"></ul>
         </div>
     </div>
 
-    <script>
+    <!-- 添加 nonce 属性 -->
+    <script nonce="random123">
         const API_BASE_URL = 'http://20.189.115.243:8081/api';
+        let csrfToken = '';
 
+        // Check authentication status
+        async function checkAuth() {
+            try {
+                console.log('Checking authentication...');
+                const response = await fetch(`${API_BASE_URL}/auth/check`, {
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                console.log('Auth check response status:', response.status);
+                console.log('Auth check response headers:', [...response.headers.entries()]);
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    console.error('Auth check failed:', error);
+                    window.location.href = 'http://20.189.115.243/login.html';
+                    return false;
+                }
+                
+                const data = await response.json();
+                console.log('Auth check successful, user data:', data);
+                
+                if (!data.isAdmin) {
+                    console.log('User is not admin, redirecting to index page...');
+                    window.location.href = 'http://20.189.115.243/index.html';
+                    return false;
+                }
+                
+                document.getElementById('userEmail').textContent = data.email;
+                return true;
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                window.location.href = 'http://20.189.115.243/login.html';
+                return false;
+            }
+        }
+
+        // Get CSRF token
+        async function getCsrfToken() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/csrf`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                csrfToken = data.token;
+                return true;
+            } catch (error) {
+                console.error('Failed to get CSRF token:', error);
+                return false;
+            }
+        }
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try {
+                await fetch(`${API_BASE_URL}/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'X-CSRF-Token': csrfToken
+                    }
+                });
+                window.location.href = '/login.html';
+            } catch (error) {
+                console.error('Logout failed:', error);
+            }
+        });
+
+        // Modify all API requests to include CSRF token
+        async function makeAuthenticatedRequest(url, options = {}) {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: {
+                    ...options.headers
+                }
+            };
+
+            // 确保在所有非 GET 请求中添加 CSRF token
+            if (options.method && options.method !== 'GET') {
+                if (!csrfToken) {
+                    // 如果没有 CSRF token，重新获取
+                    await getCsrfToken();
+                }
+                defaultOptions.headers['X-CSRF-Token'] = csrfToken;
+            }
+
+            console.log('Making request with options:', {
+                url,
+                method: options.method || 'GET',
+                headers: defaultOptions.headers
+            });
+
+            const response = await fetch(url, { ...defaultOptions, ...options });
+            return response;
+        }
+
+        function escapeHTML(str) {
+            if (str == null) {
+                return '';
+            }
+            if (typeof str !== 'string') {
+                str = String(str);
+            }
+            return str.replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;')
+                      .replace(/'/g, '&#039;');
+        }
+
+        // Load categories
         async function loadCategories() {
             try {
-                const response = await fetch(`${API_BASE_URL}/categories`);
-                const categories = await response.json();
+                console.log('Sending request to load categories...');
+                const response = await makeAuthenticatedRequest(`${API_BASE_URL}/categories`);
+                console.log('Categories response status:', response.status);
                 
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Failed to load categories:', errorData);
+                    throw new Error(errorData.message || 'Failed to load categories');
+                }
+                
+                const categories = await response.json();
+                console.log('Categories loaded:', categories);
+                
+                // Update category select
                 const categorySelect = document.getElementById('productCategory');
-                categorySelect.innerHTML = categories.map(cat => 
-                    `<option value="${cat.catid}">${cat.name}</option>`
-                ).join('');
+                categorySelect.innerHTML = '<option value="">Select a category</option>' +
+                    categories.map(cat => `
+                        <option value="${escapeHTML(cat.catid)}">${escapeHTML(cat.name)}</option>
+                    `).join('');
+                
+                // Update category list
+                const categoryList = document.getElementById('categoryList');
+                categoryList.innerHTML = categories.map(cat => `
+                    <li class="list-item" data-catid="${cat.catid}">
+                        <div class="category-info">
+                            <span>${escapeHTML(cat.name)}</span>
+                            <div class="category-actions">
+                                <button class="edit-btn">Edit</button>
+                                <button class="delete-btn">Delete</button>
+                            </div>
+                        </div>
+                    </li>
+                `).join('');
 
-                const categoriesList = document.getElementById('categoriesList');
-                categoriesList.innerHTML = `
-                    <table>
-                        <tr>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Actions</th>
-                        </tr>
-                        ${categories.map(cat => `
-                            <tr>
-                                <td>${cat.catid}</td>
-                                <td>${cat.name}</td>
-                                <td>
-                                    <button class="edit-btn" onclick="editCategory(${cat.catid}, '${cat.name}')">Edit</button>
-                                    <button class="delete-btn" onclick="deleteCategory(${cat.catid})">Delete</button>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </table>
-                `;
+                // 添加事件监听器
+                categoryList.querySelectorAll('.list-item').forEach(item => {
+                    const catid = item.dataset.catid;
+                    const name = item.querySelector('span').textContent;
+                    
+                    item.querySelector('.edit-btn').addEventListener('click', () => editCategory(catid, name));
+                    item.querySelector('.delete-btn').addEventListener('click', () => deleteCategory(catid));
+                });
             } catch (error) {
                 console.error('Failed to load categories:', error);
+                alert('Failed to load categories: ' + error.message);
             }
         }
 
+        // Load products
         async function loadProducts() {
             try {
-                const categoriesResponse = await fetch(`${API_BASE_URL}/categories`);
+                console.log('Loading products by categories...');
+                // 先获取所有分类
+                const categoriesResponse = await makeAuthenticatedRequest(`${API_BASE_URL}/categories`);
+                if (!categoriesResponse.ok) {
+                    throw new Error('Failed to load categories');
+                }
                 const categories = await categoriesResponse.json();
                 
-                let allProducts = [];
-                for (const category of categories) {
-                    const response = await fetch(`${API_BASE_URL}/products/category/${category.catid}`);
-                    const products = await response.json();
-                    allProducts = [...allProducts, ...products];
-                }
-
-                const productsList = document.getElementById('productsList');
-                productsList.innerHTML = `
-                    <table>
-                        <tr>
-                            <th>Image</th>
-                            <th>Name</th>
-                            <th>Category</th>
-                            <th>Price</th>
-                            <th>Actions</th>
-                        </tr>
-                        ${allProducts.map(product => `
-                            <tr>
-                                <td>
-                                    ${product.thumbnail_path ? 
-                                        `<img src="${product.thumbnail_path.replace(API_BASE_URL, '')}" class="preview-image" alt="${product.name}">` : 
-                                        'No image'}
-                                </td>
-                                <td>${product.name}</td>
-                                <td>${categories.find(c => c.catid === product.catid)?.name || 'Unknown category'}</td>
-                                <td>$${product.price}</td>
-                                <td>
-                                    <button class="edit-btn" onclick="editProduct(${product.pid})">Edit</button>
-                                    <button class="delete-btn" onclick="deleteProduct(${product.pid})">Delete</button>
-                                </td>
-                            </tr>
+                // 存储所有商品的 Promise
+                const productPromises = categories.map(category => 
+                    makeAuthenticatedRequest(`${API_BASE_URL}/products/category/${category.catid}`)
+                        .then(response => response.json())
+                        .then(products => ({
+                            category: category.name,
+                            products: products
+                        }))
+                );
+                
+                // 等待所有商品加载完成
+                const categoryProducts = await Promise.all(productPromises);
+                console.log('Products loaded by categories:', categoryProducts);
+                
+                // 更新产品列表
+                const productList = document.getElementById('productList');
+                productList.innerHTML = categoryProducts.map(({ category, products }) => `
+                    ${products.length > 0 ? `
+                        <li class="category-header">${escapeHTML(category)}</li>
+                        ${products.map(product => `
+                            <li class="list-item" data-pid="${product.pid}">
+                                <div class="product-info">
+                                    ${product.image_path ? 
+                                        `<img src="/uploads/${product.image_path.split('/').pop()}" alt="${escapeHTML(product.name)}" class="product-image">` : 
+                                        '<div class="no-image">No image</div>'
+                                    }
+                                    <div class="product-details">
+                                        <strong>${escapeHTML(product.name)}</strong>
+                                        <br>
+                                        <small>Price: $${escapeHTML(product.price)}</small>
+                                        ${product.description ? `<br><small>Description: ${escapeHTML(product.description)}</small>` : ''}
+                                    </div>
+                                </div>
+                                <div class="product-actions">
+                                    <button class="edit-btn">Edit</button>
+                                    <button class="delete-btn">Delete</button>
+                                </div>
+                            </li>
                         `).join('')}
-                    </table>
-                `;
+                    ` : ''}
+                `).join('');
+
+                // 添加产品事件监听器
+                productList.querySelectorAll('.list-item[data-pid]').forEach(item => {
+                    const pid = item.dataset.pid;
+                    
+                    item.querySelector('.edit-btn')?.addEventListener('click', () => editProduct(pid));
+                    item.querySelector('.delete-btn')?.addEventListener('click', () => deleteProduct(pid));
+                });
+                
+                // 如果没有任何商品，显示提示信息
+                if (productList.innerHTML.trim() === '') {
+                    productList.innerHTML = '<li class="list-item">No products available</li>';
+                }
             } catch (error) {
                 console.error('Failed to load products:', error);
+                alert('Failed to load products: ' + error.message);
             }
         }
 
+        // Add category
         document.getElementById('categoryForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const name = document.getElementById('categoryName').value;
+            
+            const form = e.target;
+            const name = document.getElementById('categoryName').value.trim();
+            const isEditMode = form.dataset.editMode === 'true';
+            const categoryId = form.dataset.editId;
+            
+            if (!name) {
+                document.getElementById('categoryNameError').textContent = 'Category name is required';
+                document.getElementById('categoryNameError').style.display = 'block';
+                return;
+            }
             
             try {
-                const response = await fetch(`${API_BASE_URL}/categories`, {
-                    method: 'POST',
+                const url = isEditMode ? 
+                    `${API_BASE_URL}/categories/${categoryId}` : 
+                    `${API_BASE_URL}/categories`;
+                
+                // 确保在发送请求前已经获取到了 CSRF token
+                if (!csrfToken) {
+                    await getCsrfToken();
+                }
+                
+                const response = await makeAuthenticatedRequest(url, {
+                    method: isEditMode ? 'PUT' : 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
                     },
                     body: JSON.stringify({ name })
                 });
-
+                
                 if (response.ok) {
-                    document.getElementById('categoryName').value = '';
+                    form.reset();
+                    form.dataset.editMode = 'false';
+                    form.dataset.editId = '';
+                    const submitButton = form.querySelector('button[type="submit"]');
+                    submitButton.textContent = 'Add Category';
+                    document.getElementById('categorySuccess').textContent = 
+                        isEditMode ? 'Category updated successfully' : 'Category added successfully';
+                    document.getElementById('categorySuccess').style.display = 'block';
                     loadCategories();
                 } else {
                     const error = await response.json();
-                    alert(error.message);
+                    document.getElementById('categoryNameError').textContent = error.message || 'Failed to save category';
+                    document.getElementById('categoryNameError').style.display = 'block';
                 }
             } catch (error) {
-                console.error('Failed to add category:', error);
-                alert('Failed to add category');
+                console.error('Failed to save category:', error);
+                document.getElementById('categoryNameError').textContent = 'Failed to save category';
+                document.getElementById('categoryNameError').style.display = 'block';
             }
         });
 
-        function validateProductForm() {
-            let isValid = true;
-            const name = document.getElementById('productName');
-            const price = document.getElementById('productPrice');
-            const description = document.getElementById('productDescription');
-            const image = document.getElementById('productImage');
-
-            if (name.value.length < 2 || name.value.length > 100) {
-                document.getElementById('productNameError').style.display = 'block';
-                isValid = false;
-            } else {
-                document.getElementById('productNameError').style.display = 'none';
-            }
-
-            if (price.value < 0 || price.value > 1000000) {
-                document.getElementById('productPriceError').style.display = 'block';
-                isValid = false;
-            } else {
-                document.getElementById('productPriceError').style.display = 'none';
-            }
-
-            if (description.value.length < 10 || description.value.length > 1000) {
-                document.getElementById('productDescriptionError').style.display = 'block';
-                isValid = false;
-            } else {
-                document.getElementById('productDescriptionError').style.display = 'none';
-            }
-
-            if (image.files.length > 0) {
-                const file = image.files[0];
-                const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
-                const maxSize = 10 * 1024 * 1024;
-
-                if (!validTypes.includes(file.type) || file.size > maxSize) {
-                    document.getElementById('productImageError').style.display = 'block';
-                    isValid = false;
-                } else {
-                    document.getElementById('productImageError').style.display = 'none';
-                }
-            }
-
-            return isValid;
-        }
-
+        // Add product
         document.getElementById('productForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            if (!validateProductForm()) {
+            const name = document.getElementById('productName').value.trim();
+            const price = document.getElementById('productPrice').value;
+            const description = document.getElementById('productDescription').value.trim();
+            const categoryId = document.getElementById('productCategory').value;
+            const imageFile = document.getElementById('productImage').files[0];
+            
+            // Reset error messages
+            document.querySelectorAll('.error-message').forEach(el => {
+                el.style.display = 'none';
+            });
+            
+            // Validate inputs
+            let isValid = true;
+            
+            if (!name) {
+                document.getElementById('productNameError').textContent = 'Product name is required';
+                document.getElementById('productNameError').style.display = 'block';
+                isValid = false;
+            }
+            
+            if (!price || price <= 0) {
+                document.getElementById('productPriceError').textContent = 'Valid price is required';
+                document.getElementById('productPriceError').style.display = 'block';
+                isValid = false;
+            }
+            
+            if (!description) {
+                document.getElementById('productDescriptionError').textContent = 'Description is required';
+                document.getElementById('productDescriptionError').style.display = 'block';
+                isValid = false;
+            }
+            
+            if (!categoryId) {
+                document.getElementById('productCategoryError').textContent = 'Category is required';
+                document.getElementById('productCategoryError').style.display = 'block';
+                isValid = false;
+            }
+            
+            if (!imageFile) {
+                document.getElementById('productImageError').textContent = 'Image is required';
+                document.getElementById('productImageError').style.display = 'block';
+                isValid = false;
+            }
+            
+            if (!isValid) {
                 return;
             }
-
-            const formData = new FormData();
-            formData.append('catid', document.getElementById('productCategory').value);
-            formData.append('name', document.getElementById('productName').value);
-            formData.append('price', document.getElementById('productPrice').value);
-            formData.append('description', document.getElementById('productDescription').value);
             
-            const imageFile = document.getElementById('productImage').files[0];
-            if (imageFile) {
-                const timestamp = Date.now();
-                const fileName = imageFile.name.replace(/[^a-zA-Z0-9.]/g, '-').toLowerCase();
-                const newFileName = `${fileName.split('.')[0]}-${timestamp}.${fileName.split('.').pop()}`;
-                formData.append('image', imageFile, newFileName);
-            }
-
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('price', price);
+            formData.append('description', description);
+            formData.append('catid', categoryId);
+            formData.append('image', imageFile);
+            
             try {
-                const response = await fetch(`${API_BASE_URL}/products`, {
+                const response = await makeAuthenticatedRequest(`${API_BASE_URL}/products`, {
                     method: 'POST',
                     body: formData
                 });
-
+                
                 if (response.ok) {
                     document.getElementById('productForm').reset();
+                    document.getElementById('productSuccess').textContent = 'Product added successfully';
+                    document.getElementById('productSuccess').style.display = 'block';
                     loadProducts();
-                    alert('Product added successfully!');
                 } else {
                     const error = await response.json();
-                    alert(error.message);
+                    document.getElementById('productNameError').textContent = error.message || 'Failed to add product';
+                    document.getElementById('productNameError').style.display = 'block';
                 }
             } catch (error) {
                 console.error('Failed to add product:', error);
-                alert('Failed to add product');
+                document.getElementById('productNameError').textContent = 'Failed to add product';
+                document.getElementById('productNameError').style.display = 'block';
             }
         });
 
+        // Delete category
         async function deleteCategory(catid) {
-            if (!confirm('Are you sure you want to delete this category?')) return;
-
+            if (!confirm('Are you sure you want to delete this category? All products in this category will also be deleted.')) {
+                return;
+            }
+            
             try {
-                const response = await fetch(`${API_BASE_URL}/categories/${catid}`, {
+                const response = await makeAuthenticatedRequest(`${API_BASE_URL}/categories/${catid}`, {
                     method: 'DELETE'
                 });
-
+                
                 if (response.ok) {
-                    loadCategories();
+                    await loadCategories();
+                    await loadProducts();
                 } else {
                     const error = await response.json();
-                    alert(error.message);
+                    alert(error.message || 'Failed to delete category');
                 }
             } catch (error) {
                 console.error('Failed to delete category:', error);
@@ -359,19 +674,22 @@
             }
         }
 
+        // Delete product
         async function deleteProduct(pid) {
-            if (!confirm('Are you sure you want to delete this product?')) return;
-
+            if (!confirm('Are you sure you want to delete this product?')) {
+                return;
+            }
+            
             try {
-                const response = await fetch(`${API_BASE_URL}/products/${pid}`, {
+                const response = await makeAuthenticatedRequest(`${API_BASE_URL}/products/${pid}`, {
                     method: 'DELETE'
                 });
-
+                
                 if (response.ok) {
                     loadProducts();
                 } else {
                     const error = await response.json();
-                    alert(error.message);
+                    alert(error.message || 'Failed to delete product');
                 }
             } catch (error) {
                 console.error('Failed to delete product:', error);
@@ -379,151 +697,75 @@
             }
         }
 
-        async function editCategory(catid, currentName) {
-            const newName = prompt('Enter new category name:', currentName);
-            if (!newName) return;
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/categories/${catid}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ name: newName })
-                });
-
-                if (response.ok) {
-                    loadCategories();
-                } else {
-                    const error = await response.json();
-                    alert(error.message);
-                }
-            } catch (error) {
-                console.error('Failed to update category:', error);
-                alert('Failed to update category');
-            }
-        }
-
+        // Edit product
         async function editProduct(pid) {
             try {
-                const response = await fetch(`${API_BASE_URL}/products/${pid}`);
+                const response = await makeAuthenticatedRequest(`${API_BASE_URL}/products/${pid}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch product details');
+                }
                 const product = await response.json();
                 
-                const editForm = document.createElement('div');
-                editForm.innerHTML = `
-                    <div class="form-group">
-                        <label>Category:</label>
-                        <select id="editProductCategory" required>
-                            ${document.getElementById('productCategory').innerHTML}
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Name:</label>
-                        <input type="text" id="editProductName" value="${product.name}" required minlength="2" maxlength="100">
-                        <div class="error-message" id="editProductNameError">Product name must be between 2 and 100 characters</div>
-                    </div>
-                    <div class="form-group">
-                        <label>Price:</label>
-                        <input type="number" id="editProductPrice" step="0.01" value="${product.price}" required min="0" max="1000000">
-                        <div class="error-message" id="editProductPriceError">Price must be between 0 and 1,000,000</div>
-                    </div>
-                    <div class="form-group">
-                        <label>Description:</label>
-                        <textarea id="editProductDescription" required minlength="10" maxlength="1000">${product.description}</textarea>
-                        <div class="error-message" id="editProductDescriptionError">Description must be between 10 and 1000 characters</div>
-                    </div>
-                    <div class="form-group">
-                        <label>New Image (Optional, JPG/GIF/PNG, max 10MB):</label>
-                        <input type="file" id="editProductImage" accept="image/jpeg,image/png,image/gif">
-                        <div class="error-message" id="editProductImageError">Please select a valid image file (JPG/PNG/GIF) under 10MB</div>
-                    </div>
-                `;
-
-                const result = confirm('Do you want to edit this product?');
-                if (!result) return;
-
-                if (!validateEditForm()) {
-                    return;
-                }
-
-                const formData = new FormData();
-                formData.append('catid', document.getElementById('editProductCategory').value);
-                formData.append('name', document.getElementById('editProductName').value);
-                formData.append('price', document.getElementById('editProductPrice').value);
-                formData.append('description', document.getElementById('editProductDescription').value);
+                // 填充表单
+                document.getElementById('productName').value = product.name;
+                document.getElementById('productPrice').value = product.price;
+                document.getElementById('productDescription').value = product.description;
+                document.getElementById('productCategory').value = product.catid;
                 
-                const imageFile = document.getElementById('editProductImage').files[0];
-                if (imageFile) {
-                    const timestamp = Date.now();
-                    const fileName = imageFile.name.replace(/[^a-zA-Z0-9.]/g, '-').toLowerCase();
-                    const newFileName = `${fileName.split('.')[0]}-${timestamp}.${fileName.split('.').pop()}`;
-                    formData.append('image', imageFile, newFileName);
-                }
-
-                const updateResponse = await fetch(`${API_BASE_URL}/products/${pid}`, {
-                    method: 'PUT',
-                    body: formData
-                });
-
-                if (updateResponse.ok) {
-                    loadProducts();
-                    alert('Product updated successfully!');
-                } else {
-                    const error = await updateResponse.json();
-                    alert(error.message);
-                }
+                // 修改提交按钮和表单行为
+                const form = document.getElementById('productForm');
+                const submitButton = form.querySelector('button[type="submit"]');
+                submitButton.textContent = 'Update Product';
+                
+                // 存储产品ID用于更新
+                form.dataset.editMode = 'true';
+                form.dataset.editId = pid;
+                
+                // 滚动到表单
+                form.scrollIntoView({ behavior: 'smooth' });
             } catch (error) {
-                console.error('Failed to update product:', error);
-                alert('Failed to update product');
+                console.error('Failed to load product details:', error);
+                alert('Failed to load product details');
             }
         }
 
-        function validateEditForm() {
-            let isValid = true;
-            const name = document.getElementById('editProductName');
-            const price = document.getElementById('editProductPrice');
-            const description = document.getElementById('editProductDescription');
-            const image = document.getElementById('editProductImage');
-
-            if (name.value.length < 2 || name.value.length > 100) {
-                document.getElementById('editProductNameError').style.display = 'block';
-                isValid = false;
-            } else {
-                document.getElementById('editProductNameError').style.display = 'none';
-            }
-
-            if (price.value < 0 || price.value > 1000000) {
-                document.getElementById('editProductPriceError').style.display = 'block';
-                isValid = false;
-            } else {
-                document.getElementById('editProductPriceError').style.display = 'none';
-            }
-
-            if (description.value.length < 10 || description.value.length > 1000) {
-                document.getElementById('editProductDescriptionError').style.display = 'block';
-                isValid = false;
-            } else {
-                document.getElementById('editProductDescriptionError').style.display = 'none';
-            }
-
-            if (image.files.length > 0) {
-                const file = image.files[0];
-                const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
-                const maxSize = 10 * 1024 * 1024;
-
-                if (!validTypes.includes(file.type) || file.size > maxSize) {
-                    document.getElementById('editProductImageError').style.display = 'block';
-                    isValid = false;
-                } else {
-                    document.getElementById('editProductImageError').style.display = 'none';
-                }
-            }
-
-            return isValid;
+        // Add category edit function
+        async function editCategory(catid, name) {
+            const categoryName = document.getElementById('categoryName');
+            const categoryForm = document.getElementById('categoryForm');
+            const submitButton = categoryForm.querySelector('button[type="submit"]');
+            
+            categoryName.value = name;
+            categoryForm.dataset.editMode = 'true';
+            categoryForm.dataset.editId = catid;
+            submitButton.textContent = 'Update Category';
+            
+            // 滚动到表单
+            categoryForm.scrollIntoView({ behavior: 'smooth' });
         }
 
-        loadCategories();
-        loadProducts();
+        // Initialize
+        async function init() {
+            console.log('Initializing admin page...');
+            const isAuthenticated = await checkAuth();
+            if (!isAuthenticated) {
+                console.log('Authentication failed, stopping initialization');
+                return;
+            }
+            
+            console.log('Authentication successful, getting CSRF token...');
+            const hasToken = await getCsrfToken();
+            if (!hasToken) {
+                console.error('Failed to initialize: Could not get CSRF token');
+                return;
+            }
+            
+            console.log('CSRF token obtained, loading data...');
+            await loadCategories();
+            await loadProducts();
+        }
+
+        init();
     </script>
 </body>
-</html> 
+</html>

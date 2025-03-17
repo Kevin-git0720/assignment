@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Product Details - Shopping Website</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'nonce-random123'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://20.189.115.243:8081;">
     <style>
         body {
             font-family: Arial;
@@ -145,9 +146,31 @@
             margin-top: 10px;
             font-weight: bold;
         }
+
+        .user-info {
+            text-align: right;
+            padding: 10px;
+            background-color: #f8f9fa;
+            margin-bottom: 20px;
+        }
+        .user-info span {
+            margin-right: 10px;
+        }
+        .admin-link {
+            color: #4CAF50;
+            text-decoration: none;
+        }
+        .admin-link:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
+    <div class="user-info">
+        <span id="userEmail">Guest</span>
+        <a href="/login.html" id="loginLink">Login</a>
+        <a href="#" id="logoutLink" style="display: none;">Logout</a>
+    </div>
     <div class="container">
         <nav class="nav-menu" id="navMenu">
             <a href="index.html">Home</a>
@@ -168,40 +191,146 @@
         <div id="cartTotal">Total: $0.00</div>
     </div>
 
-    <script>
+    <script nonce="random123">
         const API_BASE_URL = 'http://20.189.115.243:8081/api';
-        let cart = JSON.parse(localStorage.getItem('cart')) || {};
+        let csrfToken = '';
 
-        // Get product ID from URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const pid = urlParams.get('pid');
+        // Check authentication status - commented out as per requirement
+        /*async function checkAuth() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/check`, {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('userEmail').textContent = data.email;
+                    document.getElementById('loginLink').style.display = 'none';
+                    document.getElementById('logoutLink').style.display = 'inline';
+                    
+                    if (data.isAdmin) {
+                        const adminLink = document.createElement('a');
+                        adminLink.href = '/admin.html';
+                        adminLink.className = 'admin-link';
+                        adminLink.textContent = 'Admin Panel';
+                        document.querySelector('.user-info').appendChild(adminLink);
+                    }
+                } else {
+                    document.getElementById('userEmail').textContent = 'Guest';
+                    document.getElementById('loginLink').style.display = 'inline';
+                    document.getElementById('logoutLink').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                document.getElementById('userEmail').textContent = 'Guest';
+            }
+        }*/
+
+        // Get CSRF token
+        async function getCsrfToken() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/csrf`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                csrfToken = data.token;
+            } catch (error) {
+                console.error('Failed to get CSRF token:', error);
+            }
+        }
+
+        // Logout - commented out as per requirement
+        /*document.getElementById('logoutLink').addEventListener('click', async (e) => {
+            e.preventDefault();
+            try {
+                await fetch(`${API_BASE_URL}/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'X-CSRF-Token': csrfToken
+                    }
+                });
+                window.location.reload();
+            } catch (error) {
+                console.error('Logout failed:', error);
+            }
+        });*/
+
+        // Modify all API requests to include CSRF token
+        async function makeAuthenticatedRequest(url, options = {}) {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: {
+                    'X-CSRF-Token': csrfToken,
+                    ...options.headers
+                }
+            };
+
+            const response = await fetch(url, { ...defaultOptions, ...options });
+            return response;
+        }
+
+        function escapeHTML(str) {
+            if (str == null) {
+                return '';
+            }
+            if (typeof str !== 'string') {
+                str = String(str);
+            }
+            return str.replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;')
+                      .replace(/'/g, '&#039;');
+        }
+
+        // Get URL parameters
+        function getQueryParam(param) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(param);
+        }
 
         // Load product details
         async function loadProductDetails() {
-            try {
-                if (!pid) {
-                    throw new Error('Product ID not provided');
-                }
+            const pid = getQueryParam('pid');
+            if (!pid) {
+                window.location.href = '/index.html';
+                return;
+            }
 
-                const response = await fetch(`${API_BASE_URL}/products/${pid}`);
+            try {
+                const response = await makeAuthenticatedRequest(`${API_BASE_URL}/products/${pid}`);
+                if (!response.ok) {
+                    throw new Error('Product not found');
+                }
                 const product = await response.json();
+                
+                // document.getElementById('productImage').src = escapeHTML(product.image_path);
+                // document.getElementById('productName').textContent = escapeHTML(product.name);
+                // document.getElementById('productPrice').textContent = `$${escapeHTML(product.price)}`;
+                // document.getElementById('productDescription').textContent = escapeHTML(product.description);
+                
+                // // Update add to cart button
+                // const addToCartBtn = document.getElementById('addToCartBtn');
+                // addToCartBtn.onclick = () => addToCart(product);
+
 
                 // Update navigation
                 document.getElementById('navMenu').innerHTML = `
                     <a href="index.html">Home</a> &gt;
-                    <span>${product.name}</span>
+                    <span>${escapeHTML(product.name)}</span>
                 `;
 
                 // Update product details
                 document.getElementById('productDetails').innerHTML = `
                     <div class="product-details">
                         <div class="product-image">
-                            <img src="${product.image_path}" alt="${product.name}">
+                            <img src="${escapeHTML(product.image_path)}" alt="${escapeHTML(product.name)}">
                         </div>
                         <div class="product-info">
-                            <h1 class="product-title">${product.name}</h1>
-                            <div class="product-price">$${product.price}</div>
-                            <p class="product-description">${product.description}</p>
+                            <h1 class="product-title">${escapeHTML(product.name)}</h1>
+                            <div class="product-price">$${escapeHTML(product.price)}</div>
+                            <p class="product-description">${escapeHTML(product.description)}</p>
                             <div class="quantity-controls">
                                 <button onclick="updateQuantity(-1)">-</button>
                                 <span id="quantity">1</span>
@@ -215,89 +344,26 @@
                 `;
             } catch (error) {
                 console.error('Failed to load product details:', error);
-                document.getElementById('productDetails').innerHTML = `
-                    <div class="error-message">
-                        Failed to load product details. Please try again later.
-                    </div>
-                `;
+                alert('Failed to load product details');
             }
-        }
-
-        // Update quantity
-        function updateQuantity(change) {
-            const quantityElement = document.getElementById('quantity');
-            let quantity = parseInt(quantityElement.textContent);
-            quantity = Math.max(1, quantity + change);
-            quantityElement.textContent = quantity;
         }
 
         // Add to cart
         function addToCart(product) {
-            const quantity = parseInt(document.getElementById('quantity').textContent);
-            
-            if (!cart[product.pid]) {
-                cart[product.pid] = {
-                    ...product,
-                    quantity: 0
-                };
-            }
-            cart[product.pid].quantity += quantity;
-            
-            // Save cart to localStorage
+            let cart = JSON.parse(localStorage.getItem('cart')) || {};
+            cart[product.pid] = (cart[product.pid] || 0) + 1;
             localStorage.setItem('cart', JSON.stringify(cart));
-            
-            // Update cart display
-            updateCart();
-            
-            // Show success message
-            alert(`Added ${quantity} item(s) to cart`);
-        }
-
-        // Update cart display
-        function updateCart() {
-            const cartItems = document.getElementById('cartItems');
-            const items = Object.values(cart);
-            
-            if (items.length === 0) {
-                cartItems.innerHTML = '<div class="empty-cart">Your cart is empty</div>';
-                document.getElementById('cartTotal').textContent = 'Total: $0.00';
-                return;
-            }
-            
-            cartItems.innerHTML = items.map(item => `
-                <div class="cart-item">
-                    <div class="cart-item-details">
-                        <h4>${item.name}</h4>
-                        <p>$${item.price}</p>
-                        <div class="quantity-controls">
-                            <button onclick="updateCartQuantity(${item.pid}, -1)">-</button>
-                            <span>${item.quantity}</span>
-                            <button onclick="updateCartQuantity(${item.pid}, 1)">+</button>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-            
-            const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-            document.getElementById('cartTotal').textContent = `Total: $${total.toFixed(2)}`;
-        }
-
-        // Update cart item quantity
-        function updateCartQuantity(pid, change) {
-            if (!cart[pid]) return;
-            
-            cart[pid].quantity += change;
-            if (cart[pid].quantity <= 0) {
-                delete cart[pid];
-            }
-            
-            localStorage.setItem('cart', JSON.stringify(cart));
-            updateCart();
+            alert('Added to cart');
         }
 
         // Initialize
-        loadProductDetails();
-        updateCart();
+        async function init() {
+            // await checkAuth(); // Commented out authentication check
+            await getCsrfToken();
+            loadProductDetails();
+        }
+
+        init();
     </script>
 </body>
 </html> 

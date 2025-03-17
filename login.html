@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - Shopping Website</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'nonce-random123'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://20.189.115.243:8081;">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .login-container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #666;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .error-message {
+            color: #f44336;
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+            display: none;
+        }
+
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 1rem;
+            color: #666;
+            text-decoration: none;
+        }
+
+        .back-link:hover {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>Login</h1>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
+                <div class="error-message" id="emailError"></div>
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
+                <div class="error-message" id="passwordError"></div>
+            </div>
+            <button type="submit">Login</button>
+        </form>
+        <button id="showChangePasswordBtn" style="margin-top: 10px; background-color: #2196F3;">Change Password</button>
+        
+        <!-- 添加修改密码表单 -->
+        <form id="changePasswordForm" style="display: none; margin-top: 20px;">
+            <h2 style="text-align: center; font-size: 1.5rem;">Change Password</h2>
+            <div class="form-group">
+                <label for="changeEmail">Email:</label>
+                <input type="email" id="changeEmail" required>
+                <div class="error-message" id="changeEmailError"></div>
+            </div>
+            <div class="form-group">
+                <label for="currentPassword">Current Password:</label>
+                <input type="password" id="currentPassword" required>
+                <div class="error-message" id="currentPasswordError"></div>
+            </div>
+            <div class="form-group">
+                <label for="newPassword">New Password:</label>
+                <input type="password" id="newPassword" required>
+                <div class="error-message" id="newPasswordError"></div>
+            </div>
+            <div class="form-group">
+                <label for="confirmPassword">Confirm New Password:</label>
+                <input type="password" id="confirmPassword" required>
+                <div class="error-message" id="confirmPasswordError"></div>
+            </div>
+            <button type="submit" style="background-color: #2196F3;">Update Password</button>
+            <button type="button" id="cancelChangePassword" style="background-color: #f44336; margin-top: 10px;">Cancel</button>
+        </form>
+        
+        <a href="/index.html" class="back-link">Back to Home</a>
+    </div>
+
+    <script nonce="random123">
+        const API_BASE_URL = 'http://20.189.115.243:8081/api';
+        let csrfToken = '';
+
+        // Get CSRF token
+        async function getCsrfToken() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/csrf`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                csrfToken = data.token;
+            } catch (error) {
+                console.error('Failed to get CSRF token:', error);
+            }
+        }
+
+        // Validate email format
+        function validateEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+
+        // Validate password
+        function validatePassword(password) {
+            return password.length >= 6;
+        }
+
+        // Show error message
+        function showError(elementId, message) {
+            const errorElement = document.getElementById(elementId);
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
+
+        // Hide error message
+        function hideError(elementId) {
+            const errorElement = document.getElementById(elementId);
+            errorElement.style.display = 'none';
+        }
+
+        // Handle form submission
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            // Reset error messages
+            hideError('emailError');
+            hideError('passwordError');
+            
+            // Validate inputs
+            let isValid = true;
+            
+            if (!validateEmail(email)) {
+                showError('emailError', 'Please enter a valid email address');
+                isValid = false;
+            }
+            
+            if (!validatePassword(password)) {
+                showError('passwordError', 'Password must be at least 6 characters long');
+                isValid = false;
+            }
+            
+            if (!isValid) {
+                return;
+            }
+            
+            try {
+                console.log('Attempting login...');
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ email, password })
+                });
+                
+                console.log('Login response status:', response.status);
+                console.log('Response headers:', [...response.headers.entries()]);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Login successful, user data:', data);
+                    
+                    // 等待一段时间，确保 cookie 已经设置
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    // 检查 cookie 是否设置成功
+                    console.log('All cookies after login:', document.cookie);
+                    
+                    // 在重定向之前先测试一下 categories 接口
+                    try {
+                        console.log('Testing categories API...');
+                        const testResponse = await fetch(`${API_BASE_URL}/categories`, {
+                            credentials: 'include',
+                            headers: {
+                                'Cookie': document.cookie
+                            }
+                        });
+                        console.log('Test categories response status:', testResponse.status);
+                        console.log('Test categories response headers:', [...testResponse.headers.entries()]);
+                        
+                        if (!testResponse.ok) {
+                            console.error('Categories API test failed with status:', testResponse.status);
+                            const errorData = await testResponse.json();
+                            console.error('Categories API error:', errorData);
+                        } else {
+                            const testData = await testResponse.json();
+                            console.log('Test categories data:', testData);
+                        }
+                    } catch (error) {
+                        console.error('Test categories request failed:', error);
+                    }
+                    
+                    // 使用完整的 URL 进行重定向
+                    if (data.isAdmin) {
+                        console.log('Redirecting to admin page...');
+                        window.location.href = 'http://20.189.115.243/admin.html';
+                    } else {
+                        console.log('Redirecting to home page...');
+                        window.location.href = 'http://20.189.115.243/index.html';
+                    }
+                } else {
+                    const error = await response.json();
+                    console.error('Login failed with error:', error);
+                    showError('emailError', error.message || 'Login failed. Please try again.');
+                }
+            } catch (error) {
+                console.error('Login request failed:', error);
+                showError('emailError', 'Login failed. Please try again.');
+            }
+        });
+
+        // Show/hide change password form
+        document.getElementById('showChangePasswordBtn').addEventListener('click', () => {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('showChangePasswordBtn').style.display = 'none';
+            document.getElementById('changePasswordForm').style.display = 'block';
+        });
+
+        document.getElementById('cancelChangePassword').addEventListener('click', () => {
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('showChangePasswordBtn').style.display = 'block';
+            document.getElementById('changePasswordForm').style.display = 'none';
+            // Clear form and errors
+            document.getElementById('changePasswordForm').reset();
+            document.querySelectorAll('#changePasswordForm .error-message').forEach(el => {
+                el.style.display = 'none';
+            });
+        });
+
+        // Handle change password form submission
+        document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('changeEmail').value;
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            // Reset error messages
+            document.querySelectorAll('#changePasswordForm .error-message').forEach(el => {
+                el.style.display = 'none';
+            });
+            
+            // Validate inputs
+            let isValid = true;
+            
+            if (!validateEmail(email)) {
+                showError('changeEmailError', 'Please enter a valid email address');
+                isValid = false;
+            }
+            
+            if (!validatePassword(currentPassword)) {
+                showError('currentPasswordError', 'Current password must be at least 6 characters long');
+                isValid = false;
+            }
+            
+            if (!validatePassword(newPassword)) {
+                showError('newPasswordError', 'New password must be at least 6 characters long');
+                isValid = false;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                showError('confirmPasswordError', 'Passwords do not match');
+                isValid = false;
+            }
+            
+            if (!isValid) {
+                return;
+            }
+            
+            try {
+                // 首先验证当前密码
+                const loginResponse = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: JSON.stringify({
+                        email,
+                        password: currentPassword
+                    })
+                });
+
+                if (!loginResponse.ok) {
+                    const error = await loginResponse.json();
+                    showError('currentPasswordError', 'Current password is incorrect');
+                    return;
+                }
+
+                // 如果当前密码验证成功，继续修改密码
+                const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: JSON.stringify({
+                        email,
+                        oldPassword: currentPassword,
+                        newPassword,
+                        currentPassword
+                    })
+                });
+                
+                if (response.ok) {
+                    alert('Password changed successfully. Please login with your new password.');
+                    // 清除所有 cookies
+                    document.cookie.split(';').forEach(cookie => {
+                        const [name] = cookie.split('=');
+                        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+                    });
+                    window.location.reload();
+                } else {
+                    const error = await response.json();
+                    showError('currentPasswordError', error.message || 'Failed to change password');
+                }
+            } catch (error) {
+                console.error('Password change failed:', error);
+                showError('currentPasswordError', 'Failed to change password. Please try again.');
+            }
+        });
+
+        // Initialize
+        async function init() {
+            await getCsrfToken();
+        }
+
+        init();
+    </script>
+</body>
+</html> 

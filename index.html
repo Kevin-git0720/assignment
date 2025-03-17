@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Shopping Website</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'nonce-random123'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://20.189.115.243:8081;">
     <style>
         body {
             font-family: Arial;
@@ -137,9 +138,31 @@
         .category-link:hover {
             background-color: #eee;
         }
+
+        .user-info {
+            text-align: right;
+            padding: 10px;
+            background-color: #f8f9fa;
+            margin-bottom: 20px;
+        }
+        .user-info span {
+            margin-right: 10px;
+        }
+        .admin-link {
+            color: #4CAF50;
+            text-decoration: none;
+        }
+        .admin-link:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
+    <div class="user-info">
+        <span id="userEmail">Guest</span>
+        <a href="/login.html" id="loginLink">Login</a>
+        <a href="#" id="logoutLink" style="display: none;">Logout</a>
+    </div>
     <div class="container">
         <aside class="sidebar">
             <h2>Categories</h2>
@@ -165,44 +188,138 @@
         <div id="cartTotal">Total: $0.00</div>
     </div>
 
-    <script>
+    <script nonce="random123">
         const API_BASE_URL = 'http://20.189.115.243:8081/api';
         let currentCategory = null;
         let cart = JSON.parse(localStorage.getItem('cart')) || {};
+        let csrfToken = '';
+
+        // Check authentication status - commented out as per requirement
+        /*async function checkAuth() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/check`, {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('userEmail').textContent = data.email;
+                    document.getElementById('loginLink').style.display = 'none';
+                    document.getElementById('logoutLink').style.display = 'inline';
+                    
+                    if (data.isAdmin) {
+                        const adminLink = document.createElement('a');
+                        adminLink.href = '/admin.html';
+                        adminLink.className = 'admin-link';
+                        adminLink.textContent = 'Admin Panel';
+                        document.querySelector('.user-info').appendChild(adminLink);
+                    }
+                } else {
+                    document.getElementById('userEmail').textContent = 'Guest';
+                    document.getElementById('loginLink').style.display = 'inline';
+                    document.getElementById('logoutLink').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                document.getElementById('userEmail').textContent = 'Guest';
+            }
+        }*/
+
+        // Get CSRF token
+        async function getCsrfToken() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/csrf`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                csrfToken = data.token;
+            } catch (error) {
+                console.error('Failed to get CSRF token:', error);
+            }
+        }
+
+        // Logout - commented out as per requirement
+        /*document.getElementById('logoutLink').addEventListener('click', async (e) => {
+            e.preventDefault();
+            try {
+                await fetch(`${API_BASE_URL}/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'X-CSRF-Token': csrfToken
+                    }
+                });
+                window.location.reload();
+            } catch (error) {
+                console.error('Logout failed:', error);
+            }
+        });*/
+
+        // Modify all API requests to include CSRF token
+        async function makeAuthenticatedRequest(url, options = {}) {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: {
+                    'X-CSRF-Token': csrfToken,
+                    ...options.headers
+                }
+            };
+
+            const response = await fetch(url, { ...defaultOptions, ...options });
+            return response;
+        }
+
+        function escapeHTML(str) {
+            if (str == null) {
+                return '';
+            }
+            if (typeof str !== 'string') {
+                str = String(str);
+            }
+            return str.replace(/&/g, '&amp;')
+                      .replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;')
+                      .replace(/'/g, '&#039;');
+        }
 
         async function loadCategories() {
             try {
-                const response = await fetch(`${API_BASE_URL}/categories`);
+                const response = await makeAuthenticatedRequest(`${API_BASE_URL}/categories`);
                 const categories = await response.json();
                 
                 const categoryList = document.getElementById('categoryList');
-                categoryList.innerHTML = categories.map(category => `
-                    <a href="#" class="category-link" data-catid="${category.catid}">
-                        ${category.name}
-                    </a>
+                categoryList.innerHTML = categories.map(cat => `
+                    <a href="#" class="category-link" data-catid="${escapeHTML(cat.catid)}">${escapeHTML(cat.name)}</a>
                 `).join('');
 
-                categoryList.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('category-link')) {
+                // 添加事件监听器
+                document.querySelectorAll('.category-link').forEach(link => {
+                    link.addEventListener('click', (e) => {
                         e.preventDefault();
                         const catid = e.target.dataset.catid;
                         
+                        // 更新 URL
                         const url = new URL(window.location);
                         url.searchParams.set('catid', catid);
                         window.history.pushState({}, '', url);
                         
+                        // 加载产品
                         loadProducts(catid);
                         
+                        // 更新导航菜单
+                        document.getElementById('navMenu').innerHTML = `
+                            <a href="index.html">Home</a> &gt;
+                            <span>${e.target.textContent}</span>
+                        `;
+                        
+                        // 移除其他链接的活动状态
                         document.querySelectorAll('.category-link').forEach(link => {
                             link.classList.remove('active');
                         });
+                        // 添加当前链接的活动状态
                         e.target.classList.add('active');
-                        
-                        document.getElementById('navMenu').innerHTML = `
-                            <a href="index.html">Home</a> &gt;
-                            <a href="#">${e.target.textContent}</a>
-                        `;
-                    }
+                    });
                 });
 
                 const urlParams = new URLSearchParams(window.location.search);
@@ -227,7 +344,10 @@
 
         async function loadProducts(catid) {
             try {
-                const response = await fetch(`${API_BASE_URL}/products/category/${catid}`);
+                const url = catid ? 
+                    `${API_BASE_URL}/products/category/${catid}` : 
+                    `${API_BASE_URL}/products`;
+                const response = await makeAuthenticatedRequest(url);
                 const products = await response.json();
                 
                 const productList = document.getElementById('productList');
@@ -237,16 +357,28 @@
                 }
                 
                 productList.innerHTML = products.map(product => `
-                    <div class="product" onclick="window.location.href='product-details.html?pid=${product.pid}'">
-                        <img src="${product.thumbnail_path}" alt="${product.name}">
-                        <h3>${product.name}</h3>
-                        <p class="price">$${product.price}</p>
-                        <p>${product.description.length > 100 ? product.description.substring(0, 100) + '...' : product.description}</p>
-                        <button class="add-to-cart" onclick="event.stopPropagation(); addToCart(${JSON.stringify(product).replace(/"/g, '&quot;')})">
+                    <div class="product" data-pid="${product.pid}">
+                        <a href="product-details.html?pid=${product.pid}" class="product-link">
+                            <img src="${escapeHTML(product.thumbnail_path)}" alt="${escapeHTML(product.name)}">
+                            <h3>${escapeHTML(product.name)}</h3>
+                            <p class="price">$${escapeHTML(product.price)}</p>
+                            <p>${escapeHTML(product.description.length > 100 ? product.description.substring(0, 100) + '...' : product.description)}</p>
+                        </a>
+                        <button class="add-to-cart" data-product='${JSON.stringify(product).replace(/'/g, "&apos;")}'>
                             Add to Cart
                         </button>
                     </div>
                 `).join('');
+
+                // 移除之前的点击事件监听器，只保留添加到购物车的功能
+                productList.querySelectorAll('.add-to-cart').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const product = JSON.parse(button.dataset.product);
+                        addToCart(product);
+                    });
+                });
             } catch (error) {
                 console.error('Failed to load products:', error);
             }
@@ -274,18 +406,33 @@
             }
             
             cartItems.innerHTML = items.map(item => `
-                <div class="cart-item">
+                <div class="cart-item" data-pid="${item.pid}">
                     <div class="cart-item-details">
                         <h4>${item.name}</h4>
                         <p>$${item.price}</p>
                         <div class="quantity-controls">
-                            <button onclick="updateQuantity(${item.pid}, -1)">-</button>
+                            <button class="quantity-decrease">-</button>
                             <span>${item.quantity}</span>
-                            <button onclick="updateQuantity(${item.pid}, 1)">+</button>
+                            <button class="quantity-increase">+</button>
                         </div>
                     </div>
                 </div>
             `).join('');
+            
+            // 添加事件监听器
+            cartItems.querySelectorAll('.quantity-decrease').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const pid = e.target.closest('.cart-item').dataset.pid;
+                    updateQuantity(pid, -1);
+                });
+            });
+            
+            cartItems.querySelectorAll('.quantity-increase').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const pid = e.target.closest('.cart-item').dataset.pid;
+                    updateQuantity(pid, 1);
+                });
+            });
             
             const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
             document.getElementById('cartTotal').textContent = `Total: $${total.toFixed(2)}`;
@@ -303,8 +450,15 @@
             updateCart();
         }
 
-        loadCategories();
-        updateCart();
+        // Initialize
+        async function init() {
+            // await checkAuth(); // Commented out authentication check
+            await getCsrfToken();
+            loadCategories();
+            loadProducts();
+        }
+
+        init();
     </script>
 </body>
 </html>
