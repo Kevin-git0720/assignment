@@ -194,6 +194,7 @@
     <script nonce="random123">
         const API_BASE_URL = 'http://20.189.115.243:8081/api';
         let csrfToken = '';
+        let cart = JSON.parse(localStorage.getItem('cart')) || {};
 
         // Check authentication status - commented out as per requirement
         /*async function checkAuth() {
@@ -332,16 +333,41 @@
                             <div class="product-price">$${escapeHTML(product.price)}</div>
                             <p class="product-description">${escapeHTML(product.description)}</p>
                             <div class="quantity-controls">
-                                <button onclick="updateQuantity(-1)">-</button>
+                                <button class="quantity-decrease">-</button>
                                 <span id="quantity">1</span>
-                                <button onclick="updateQuantity(1)">+</button>
+                                <button class="quantity-increase">+</button>
                             </div>
-                            <button class="add-to-cart" onclick="addToCart(${JSON.stringify(product).replace(/"/g, '&quot;')})">
+                            <button class="add-to-cart" data-product='${JSON.stringify(product).replace(/'/g, "&apos;")}'>
                                 Add to Cart
                             </button>
                         </div>
                     </div>
                 `;
+
+                // 添加事件监听器
+                const quantitySpan = document.getElementById('quantity');
+                document.querySelector('.quantity-decrease').addEventListener('click', () => {
+                    const currentQuantity = parseInt(quantitySpan.textContent);
+                    if (currentQuantity > 1) {
+                        quantitySpan.textContent = currentQuantity - 1;
+                    }
+                });
+
+                document.querySelector('.quantity-increase').addEventListener('click', () => {
+                    const currentQuantity = parseInt(quantitySpan.textContent);
+                    quantitySpan.textContent = currentQuantity + 1;
+                });
+
+                document.querySelector('.add-to-cart').addEventListener('click', () => {
+                    try {
+                        const quantity = parseInt(quantitySpan.textContent);
+                        const productData = JSON.parse(document.querySelector('.add-to-cart').dataset.product);
+                        console.log('Adding to cart with quantity:', quantity, 'Product:', productData);
+                        addToCart(productData, quantity);
+                    } catch (error) {
+                        console.error('Error adding product to cart:', error);
+                    }
+                });
             } catch (error) {
                 console.error('Failed to load product details:', error);
                 alert('Failed to load product details');
@@ -349,11 +375,79 @@
         }
 
         // Add to cart
-        function addToCart(product) {
-            let cart = JSON.parse(localStorage.getItem('cart')) || {};
-            cart[product.pid] = (cart[product.pid] || 0) + 1;
+        function addToCart(product, quantity = 1) {
+            console.log('Adding to cart:', product, 'Quantity:', quantity);
+            if (!cart[product.pid]) {
+                cart[product.pid] = {
+                    pid: product.pid,
+                    name: product.name,
+                    price: parseFloat(product.price),
+                    quantity: 0
+                };
+            }
+            cart[product.pid].quantity += quantity;
+            console.log('Updated cart:', cart);
+            updateCart();
+            // 添加视觉反馈
+            alert('Product added to cart!');
+        }
+
+        function updateCart() {
+            console.log('Updating cart display');
+            const cartItems = document.getElementById('cartItems');
+            const items = Object.values(cart).filter(item => item && item.quantity > 0);
+            console.log('Cart items:', items);
+            
+            if (items.length === 0) {
+                cartItems.innerHTML = '<div class="empty-cart">Your cart is empty</div>';
+                document.getElementById('cartTotal').textContent = 'Total: $0.00';
+                localStorage.setItem('cart', JSON.stringify({}));
+                return;
+            }
+            
+            cartItems.innerHTML = items.map(item => `
+                <div class="cart-item" data-pid="${item.pid}">
+                    <div class="cart-item-details">
+                        <h4>${escapeHTML(item.name)}</h4>
+                        <p>$${item.price}</p>
+                        <div class="quantity-controls">
+                            <button class="quantity-decrease">-</button>
+                            <span>${item.quantity}</span>
+                            <button class="quantity-increase">+</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            // 添加事件监听器
+            cartItems.querySelectorAll('.quantity-decrease').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const pid = e.target.closest('.cart-item').dataset.pid;
+                    updateQuantity(pid, -1);
+                });
+            });
+            
+            cartItems.querySelectorAll('.quantity-increase').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const pid = e.target.closest('.cart-item').dataset.pid;
+                    updateQuantity(pid, 1);
+                });
+            });
+            
+            const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            document.getElementById('cartTotal').textContent = `Total: $${total}`;
+            
             localStorage.setItem('cart', JSON.stringify(cart));
-            alert('Added to cart');
+        }
+
+        function updateQuantity(pid, change) {
+            if (!cart[pid]) return;
+            
+            cart[pid].quantity += change;
+            if (cart[pid].quantity <= 0) {
+                delete cart[pid];
+            }
+            updateCart();
         }
 
         // Initialize
@@ -361,6 +455,7 @@
             // await checkAuth(); // Commented out authentication check
             await getCsrfToken();
             loadProductDetails();
+            updateCart(); // 添加这一行来初始化购物车显示
         }
 
         init();

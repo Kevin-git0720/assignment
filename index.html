@@ -375,8 +375,13 @@
                     button.addEventListener('click', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        const product = JSON.parse(button.dataset.product);
-                        addToCart(product);
+                        try {
+                            const product = JSON.parse(button.dataset.product);
+                            console.log('Adding product to cart:', product);
+                            addToCart(product);
+                        } catch (error) {
+                            console.error('Error parsing product data:', error);
+                        }
                     });
                 });
             } catch (error) {
@@ -385,30 +390,39 @@
         }
 
         function addToCart(product) {
+            console.log('Adding to cart:', product);
             if (!cart[product.pid]) {
                 cart[product.pid] = {
-                    ...product,
+                    pid: product.pid,
+                    name: product.name,
+                    price: parseFloat(product.price),
                     quantity: 0
                 };
             }
             cart[product.pid].quantity++;
+            console.log('Updated cart:', cart);
             updateCart();
+            // 添加视觉反馈
+            alert('Product added to cart!');
         }
 
         function updateCart() {
+            console.log('Updating cart display');
             const cartItems = document.getElementById('cartItems');
-            const items = Object.values(cart);
+            const items = Object.values(cart).filter(item => item && item.quantity > 0);
+            console.log('Cart items:', items);
             
             if (items.length === 0) {
                 cartItems.innerHTML = '<div class="empty-cart">Your cart is empty</div>';
                 document.getElementById('cartTotal').textContent = 'Total: $0.00';
+                localStorage.setItem('cart', JSON.stringify({}));
                 return;
             }
             
             cartItems.innerHTML = items.map(item => `
                 <div class="cart-item" data-pid="${item.pid}">
                     <div class="cart-item-details">
-                        <h4>${item.name}</h4>
+                        <h4>${escapeHTML(item.name)}</h4>
                         <p>$${item.price}</p>
                         <div class="quantity-controls">
                             <button class="quantity-decrease">-</button>
@@ -434,8 +448,8 @@
                 });
             });
             
-            const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-            document.getElementById('cartTotal').textContent = `Total: $${total.toFixed(2)}`;
+            const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            document.getElementById('cartTotal').textContent = `Total: $${total}`;
             
             localStorage.setItem('cart', JSON.stringify(cart));
         }
@@ -456,6 +470,7 @@
             await getCsrfToken();
             loadCategories();
             loadProducts();
+            updateCart();
         }
 
         init();
