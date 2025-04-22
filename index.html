@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <title>Shopping Website</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'nonce-random123'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://20.189.115.243:8081;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; 
+    script-src 'self' 'nonce-random123' https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com; 
+    style-src 'self' 'unsafe-inline' https://www.paypal.com https://*.paypalobjects.com; 
+    img-src 'self' data: https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com; 
+    connect-src 'self' https://s29.iems5718.ie.cuhk.edu.hk https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com;
+    frame-src https://www.paypal.com https://*.paypal.com;">
     <style>
         body {
             font-family: Arial;
@@ -186,10 +191,12 @@
             </div>
         </div>
         <div id="cartTotal">Total: $0.00</div>
+        <div id="paypal-button-container"></div>
     </div>
 
+    <script nonce="random123" src="https://www.paypal.com/sdk/js?client-id=AQEQPg5KCTZk4rBaoiInzK7N4Iw4uCXmfyhIOlDBIPdv_zJI6fm_PUdMrTQS9ylR7J74h7jY3XxYSVid&currency=USD"></script>
     <script nonce="random123">
-        const API_BASE_URL = 'http://20.189.115.243:8081/api';
+        const API_BASE_URL = 'https://s29.iems5718.ie.cuhk.edu.hk/api';
         let currentCategory = null;
         let cart = JSON.parse(localStorage.getItem('cart')) || {};
         let csrfToken = '';
@@ -255,7 +262,6 @@
             }
         });*/
 
-        // Modify all API requests to include CSRF token
         async function makeAuthenticatedRequest(url, options = {}) {
             const defaultOptions = {
                 credentials: 'include',
@@ -415,6 +421,7 @@
             if (items.length === 0) {
                 cartItems.innerHTML = '<div class="empty-cart">Your cart is empty</div>';
                 document.getElementById('cartTotal').textContent = 'Total: $0.00';
+                document.getElementById('paypal-button-container').innerHTML = '';
                 localStorage.setItem('cart', JSON.stringify({}));
                 return;
             }
@@ -451,6 +458,9 @@
             const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             document.getElementById('cartTotal').textContent = `Total: $${total}`;
             
+            // 初始化PayPal按钮
+            initPayPalButton();
+            
             localStorage.setItem('cart', JSON.stringify(cart));
         }
 
@@ -464,13 +474,92 @@
             updateCart();
         }
 
+        // PayPal按钮初始化
+        function initPayPalButton() {
+            paypal.Buttons({
+                createOrder: async function(data, actions) {
+                    try {
+                        console.log('开始创建PayPal订单...');
+                        const items = Object.values(cart).filter(item => item && item.quantity > 0);
+                        
+                        if (items.length === 0) {
+                            console.log('购物车为空，无法创建订单');
+                            alert('Your cart is empty');
+                            return;
+                        }
+
+                        // 发送订单验证请求
+                        console.log('发送订单验证请求...');
+                        const response = await fetch(`${API_BASE_URL}/validate-order`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': csrfToken
+                            },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                items: items.map(item => ({
+                                    pid: item.pid,
+                                    quantity: item.quantity
+                                }))
+                            })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Order validation failed');
+                        }
+
+                        const data = await response.json();
+                        console.log('订单验证成功:', data);
+
+                        // 创建PayPal订单
+                        return actions.order.create({
+                            purchase_units: [{
+                                amount: {
+                                    currency_code: "USD",
+                                    value: (items.reduce((sum, item) => sum + (item.price * item.quantity), 0)).toFixed(2)
+                                },
+                                custom_id: data.orderId,
+                                description: "Shopping Cart Purchase"
+                            }]
+                        });
+                    } catch (error) {
+                        console.error('创建订单时发生错误:', error);
+                        alert('Failed to create order. Please try again.');
+                    }
+                },
+                onApprove: async function(data, actions) {
+                    try {
+                        console.log('PayPal订单已批准:', data);
+                        const order = await actions.order.capture();
+                        console.log('订单已完成:', order);
+                        
+                        // 清空购物车
+                        cart = {};
+                        localStorage.setItem('cart', JSON.stringify(cart));
+                        updateCart();
+                        
+                        alert('Payment completed successfully!');
+                    } catch (error) {
+                        console.error('完成订单时发生错误:', error);
+                        alert('Failed to complete payment. Please try again.');
+                    }
+                },
+                onError: function(err) {
+                    console.error('PayPal错误:', err);
+                    alert('An error occurred during payment processing. Please try again.');
+                }
+            }).render('#paypal-button-container');
+        }
+
         // Initialize
         async function init() {
-            // await checkAuth(); // Commented out authentication check
+            // await checkAuth();
             await getCsrfToken();
             loadCategories();
             loadProducts();
             updateCart();
+            initPayPalButton();
         }
 
         init();

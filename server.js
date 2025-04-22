@@ -9,17 +9,19 @@ const helmet = require('helmet');
 const jwt = require('jsonwebtoken');
 const sharp = require('sharp');
 const fs = require('fs');
+const querystring = require('querystring');
+const https = require('https');
+const fetch = require('node-fetch');
+const morgan = require('morgan');
 
 const app = express();
 const port = 8081;
 
-// 使用项目本地的uploads目录
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// 复制文件的辅助函数
 async function copyFileToPublic(sourcePath, filename) {
     try {
         const targetPath = path.join(uploadsDir, filename);
@@ -27,7 +29,6 @@ async function copyFileToPublic(sourcePath, filename) {
         return `/uploads/${filename}`;
     } catch (error) {
         console.error('Error copying file to public directory:', error);
-        // 如果无法复制到公共目录，返回不带/api的路径
         return `/uploads/${filename}`;
     }
 }
@@ -35,19 +36,17 @@ async function copyFileToPublic(sourcePath, filename) {
 app.use('/api/uploads', express.static(uploadsDir));
 app.use('/uploads', express.static(uploadsDir));
 
-// 直接设置 JWT_SECRET
 process.env.JWT_SECRET = 'QOu77yG/6k0NjF3zlO7UJR8Aeyk8JmpnJ9P6VfkYgPo=';
 
-// 中间件配置
 app.use(express.json());
 app.use(cookieParser());
 app.use(helmet());
+app.use(morgan('combined'));
 app.use(cors({
-    origin: ['http://20.189.115.243', 'https://20.189.115.243'],
+    origin: ['http://20.189.115.243', 'https://20.189.115.243', 'https://s29.iems5718.ie.cuhk.edu.hk'],
     credentials: true
 }));
 
-// 数据库连接配置
 const connection = mysql.createConnection({
   host: 'localhost',
   user: 'myuser',
@@ -55,7 +54,6 @@ const connection = mysql.createConnection({
   database: 'shop'
 });
 
-// 连接数据库
 connection.connect((err) => {
     if (err) {
         console.error('Error connecting to the database:', err);
@@ -64,7 +62,6 @@ connection.connect((err) => {
     console.log('Connected to database');
 });
 
-// 文件上传配置
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
         cb(null, 'uploads/');
@@ -90,13 +87,11 @@ const upload = multer({
     }
 });
 
-// 统一的错误处理函数
 function handleError(res, error, message) {
     console.error(`Error: ${message}`, error);
     res.status(500).json({ message });
 }
 
-// 认证中间件
 const authenticateToken = (req, res, next) => {
     console.log('Cookies received:', req.cookies);
     console.log('Authorization header:', req.headers.authorization);
@@ -121,7 +116,6 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// 管理员检查中间件
 const checkAdmin = (req, res, next) => {
     if (!req.user || !req.user.isAdmin) {
         console.error('Admin check failed: User is not admin');
@@ -130,7 +124,6 @@ const checkAdmin = (req, res, next) => {
     next();
 };
 
-// CSRF 保护中间件
 const csrfProtection = (req, res, next) => {
     const token = req.headers['x-csrf-token'];
     const cookieToken = req.cookies.csrfToken;
@@ -142,7 +135,6 @@ const csrfProtection = (req, res, next) => {
     next();
 };
 
-// 输入验证中间件
 const validateInput = (req, res, next) => {
     const { email, password, name, price, description } = req.body;
     
@@ -174,7 +166,6 @@ const validateInput = (req, res, next) => {
     next();
 };
 
-// 添加密码加密和验证函数
 function hashPassword(password, salt) {
     return crypto.createHash('sha256').update(password + salt).digest('hex');
 }
@@ -183,7 +174,24 @@ function generateSalt() {
     return crypto.randomBytes(16).toString('hex');
 }
 
-// 认证路由
+function generateOrderDigest(orderData) {
+    const dataToHash = JSON.stringify({
+        currency: orderData.currency,
+        merchantEmail: orderData.merchantEmail,
+        salt: orderData.salt,
+        items: orderData.items.map(item => ({
+            pid: item.pid,
+            quantity: item.quantity,
+            price: item.price
+        })),
+        totalAmount: orderData.totalAmount
+    });
+    
+    return crypto.createHash('sha256')
+        .update(dataToHash)
+        .digest('hex');
+}
+
 app.post('/api/auth/login', validateInput, async (req, res) => {
     const { email, password } = req.body;
     
@@ -196,10 +204,8 @@ app.post('/api/auth/login', validateInput, async (req, res) => {
           return res.status(401).json({ message: 'Invalid email or password' });
         }
       
-        // 计算哈希密码
         const hashedPassword = hashPassword(password, user.salt);
         
-        // 打印出哈希密码和存储的密码
         console.log('Computed hashed password:', hashedPassword);
         console.log('Stored user password:', user.password);
         
@@ -219,19 +225,17 @@ app.post('/api/auth/login', validateInput, async (req, res) => {
         
         res.cookie('token', token, {
             httpOnly: true,
-            secure: false,
-            sameSite: 'lax',
+            secure: true,
+            sameSite: 'strict',
             maxAge: 24 * 60 * 60 * 1000,
-            domain: '20.189.115.243',
             path: '/'
         });
         
         res.cookie('sessionId', sessionId, {
             httpOnly: true,
-            secure: false,
-            sameSite: 'lax',
+            secure: true,
+            sameSite: 'strict',
             maxAge: 24 * 60 * 60 * 1000,
-            domain: '20.189.115.243',
             path: '/'
         });
         
@@ -242,7 +246,6 @@ app.post('/api/auth/login', validateInput, async (req, res) => {
     }
 });
 
-// CSRF令牌路由
 app.get('/api/auth/csrf', (req, res) => {
     const token = crypto.randomBytes(32).toString('hex');
     res.cookie('csrfToken', token, {
@@ -256,7 +259,6 @@ app.get('/api/auth/csrf', (req, res) => {
     res.json({ token });
 });
 
-// 认证检查路由
 app.get('/api/auth/check', authenticateToken, async (req, res) => {
     try {
         console.log('Checking auth for user:', req.user);
@@ -285,7 +287,6 @@ app.get('/api/auth/check', authenticateToken, async (req, res) => {
     }
 });
 
-// 退出登录路由
 app.post('/api/auth/logout', authenticateToken, async (req, res) => {
     try {
         await connection.promise().query(
@@ -301,7 +302,6 @@ app.post('/api/auth/logout', authenticateToken, async (req, res) => {
     }
 });
 
-// 修改密码路由
 app.post('/api/auth/change-password', authenticateToken, async (req, res) => {
     const { currentPassword, newPassword } = req.body;
     
@@ -342,7 +342,6 @@ app.post('/api/auth/change-password', authenticateToken, async (req, res) => {
     }
 });
 
-// 修改现有的API路由，添加认证和CSRF保护
 app.get('/api/categories', authenticateToken, checkAdmin, async (req, res) => {
     try {
         const [categories] = await connection.promise().query('SELECT * FROM categories');
@@ -458,7 +457,6 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
       const filename = path.basename(req.file.path);
       const thumbFilename = 'thumb-' + filename;
       
-      // 生成缩略图
       await sharp(req.file.path)
         .resize(200, 200, {
           fit: 'contain',
@@ -466,7 +464,6 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
         })
         .toFile(path.join(uploadsDir, thumbFilename));
       
-      // 保存不带/api前缀的路径
       imagePath = `/uploads/${filename}`;
       thumbnailPath = `/uploads/${thumbFilename}`;
     }
@@ -506,7 +503,6 @@ app.put('/api/products/:pid', upload.single('image'), async (req, res) => {
       const filename = path.basename(req.file.path);
       const thumbFilename = 'thumb-' + filename;
       
-      // 生成缩略图
       await sharp(req.file.path)
         .resize(200, 200, {
           fit: 'contain',
@@ -514,7 +510,6 @@ app.put('/api/products/:pid', upload.single('image'), async (req, res) => {
         })
         .toFile(path.join(uploadsDir, thumbFilename));
       
-      // 保存不带/api前缀的路径
       updateFields.image_path = `/uploads/${filename}`;
       updateFields.thumbnail_path = `/uploads/${thumbFilename}`;
     }
@@ -574,7 +569,6 @@ app.get('/api/cart/products', (req, res) => {
   );
 });
 
-// 获取所有产品
 app.get('/api/products', authenticateToken, checkAdmin, async (req, res) => {
     try {
         const [products] = await connection.promise().query(
@@ -587,7 +581,6 @@ app.get('/api/products', authenticateToken, checkAdmin, async (req, res) => {
     }
 });
 
-// 获取特定分类的产品
 app.get('/api/products/category/:catid', authenticateToken, async (req, res) => {
   connection.query(
     'SELECT * FROM products WHERE catid = ?',
@@ -602,7 +595,178 @@ app.get('/api/products/category/:catid', authenticateToken, async (req, res) => 
   );
 });
 
-// 错误处理中间件
+// PayPal配置
+const PAYPAL_CLIENT_ID = 'AQEQPg5KCTZk4rBaoiInzK7N4Iw4uCXmfyhIOlDBIPdv_zJI6fm_PUdMrTQS9ylR7J74h7jY3XxYSVid';
+const PAYPAL_SECRET = 'EDbS5D69TgY1q2RW5gVRZLJzV7WBEWNu8Pcr1WU18ppf7TTECSo79iKTwGomNeBkYhkKgTMWfalslhc_';
+const PAYPAL_API_BASE = 'https://api-m.sandbox.paypal.com';
+
+// PayPal IPN webhook
+app.post('/api/paypal-ipn', async (req, res) => {
+    try {
+        const { orderID } = req.body;
+        console.log('Received PayPal webhook:', req.body);
+
+        const auth = await fetch(`${PAYPAL_API_BASE}/v1/oauth2/token`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Accept-Language': 'en_US',
+                'Authorization': 'Basic ' + Buffer.from(PAYPAL_CLIENT_ID + ':' + PAYPAL_SECRET).toString('base64'),
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: 'grant_type=client_credentials'
+        });
+
+        const { access_token } = await auth.json();
+
+        const orderResponse = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders/${orderID}`, {
+            headers: {
+                'Authorization': `Bearer ${access_token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const orderData = await orderResponse.json();
+        
+        if (orderData.status !== 'COMPLETED') {
+            console.error('Order not completed:', orderData);
+            return res.status(400).send('Order not completed');
+        }
+
+        const customId = orderData.purchase_units[0].custom_id;
+
+        await connection.promise().query(
+            'UPDATE orders SET payment_status = "completed" WHERE order_id = ?',
+            [customId]
+        );
+
+        console.log('Order processed successfully');
+        res.send('OK');
+    } catch (error) {
+        console.error('Error processing PayPal webhook:', error);
+        res.status(500).send('Error processing webhook');
+    }
+});
+
+app.get('/api/admin/orders', authenticateToken, checkAdmin, async (req, res) => {
+    try {
+        const [orders] = await connection.promise().query(`
+            SELECT order_id, user_id, user_email, total_amount, 
+                   currency_code, digest, payment_status, 
+                   JSON_UNQUOTE(items) as items,
+                   created_at, updated_at
+            FROM orders
+            ORDER BY created_at DESC
+        `);
+
+        const processedOrders = orders.map(order => ({
+            ...order,
+            items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items
+        }));
+
+        res.json(processedOrders);
+    } catch (error) {
+        console.error('Error fetching admin orders:', error);
+        res.status(500).json({ error: 'Failed to fetch orders' });
+    }
+});
+
+app.get('/api/user/orders', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        
+        const [orders] = await connection.promise().query(`
+            SELECT order_id, user_id, user_email, total_amount, 
+                   currency_code, digest, payment_status, 
+                   JSON_UNQUOTE(items) as items,
+                   created_at, updated_at
+            FROM orders
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            LIMIT 5
+        `, [userId]);
+
+        // 确保items字段是有效的JSON对象
+        const processedOrders = orders.map(order => ({
+            ...order,
+            items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items
+        }));
+
+        res.json(processedOrders);
+    } catch (error) {
+        console.error('Error fetching user orders:', error);
+        res.status(500).json({ error: 'Failed to fetch orders' });
+    }
+});
+
+app.post('/api/validate-order', authenticateToken, async (req, res) => {
+    try {
+        const { items } = req.body;
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ error: 'Invalid order items' });
+        }
+
+        // 从JWT token中获取用户信息
+        const userEmail = req.user.email || 'guest';
+        const userId = req.user.id || null;
+
+        let totalAmount = 0;
+        const orderItems = [];
+
+        for (const item of items) {
+            const [products] = await connection.promise().query('SELECT * FROM products WHERE pid = ?', [item.pid]);
+            if (!products || products.length === 0) {
+                return res.status(400).json({ error: `Product ${item.pid} not found` });
+            }
+
+            const price = parseFloat(products[0].price);
+            const quantity = parseInt(item.quantity);
+            const itemTotal = price * quantity;
+            totalAmount += itemTotal;
+
+            orderItems.push({
+                pid: item.pid,
+                name: products[0].name,
+                quantity: quantity,
+                price: price
+            });
+        }
+
+        const orderData = {
+            currency: 'USD',
+            // merchantEmail: PAYPAL_EMAIL,
+            merchantEmail: userEmail,
+            salt: Math.random().toString(36).substring(7),
+            items: orderItems,
+            totalAmount: totalAmount
+        };
+        const digest = generateOrderDigest(orderData);
+
+        const [result] = await connection.promise().query(
+            'INSERT INTO orders (user_id, user_email, total_amount, currency_code, digest, payment_status, items) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [userId, userEmail, totalAmount, 'USD', digest, 'pending', JSON.stringify(orderItems)]
+        );
+
+        res.json({
+            orderId: result.insertId,
+            digest: digest
+        });
+    } catch (error) {
+        console.error('Error validating order:', error);
+        res.status(500).json({ error: 'Failed to validate order' });
+    }
+});
+
+app.get('/api/ping', (req, res) => {
+    res.json({
+        status: 'success',
+        message: 'pong',
+        timestamp: new Date().toISOString(),
+        protocol: req.protocol,
+        secure: req.secure
+    });
+});
+
 app.use((err, req, res, next) => {
     console.error('Unhandled error:', err);
     res.status(500).json({ message: 'Internal server error' });

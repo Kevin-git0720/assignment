@@ -75,7 +75,6 @@
 
         <div class="shopping-list" id="shoppingList">
             <span>Shopping List</span>
-            <span id="totalValue">: $0</span>
             <div class="list-details" id="listDetails">
                 <div class="item" id="socksItem" style="display: none;">
                     <label>Socks:</label>
@@ -100,7 +99,6 @@
             </div>
         </div>
     </div>
-
     <script>
         // store a value that shares when html pages jump each
         let totalValue = localStorage.getItem('totalValue') || 0;
@@ -117,6 +115,8 @@
             const itemDetails = document.getElementById(itemId);
             itemDetails.style.display = 'flex';
         }
-    </script>
+        </script>
 </body>
 </html>
+
+<span id="totalValue">: $0 　　　　　　　 　　</                                span>                                                                                                                                                                               　                                                                                                                                                                                                                                                                                                        

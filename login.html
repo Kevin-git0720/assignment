@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <title>Login - Shopping Website</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'nonce-random123'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://20.189.115.243:8081;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; 
+        script-src 'self' 'nonce-random123' https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com; 
+        style-src 'self' 'unsafe-inline' https://www.paypal.com https://*.paypalobjects.com; 
+        img-src 'self' data: https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com; 
+        connect-src 'self' https://s29.iems5718.ie.cuhk.edu.hk https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com;
+        frame-src https://www.paypal.com https://*.paypal.com;">
+    <!-- <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'nonce-random123'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://20.189.115.243:8081;">         -->
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -133,15 +139,23 @@
     </div>
 
     <script nonce="random123">
-        const API_BASE_URL = 'http://20.189.115.243:8081/api';
+        const API_BASE_URL = 'https://s29.iems5718.ie.cuhk.edu.hk/api';
         let csrfToken = '';
 
         // Get CSRF token
         async function getCsrfToken() {
             try {
                 const response = await fetch(`${API_BASE_URL}/auth/csrf`, {
-                    credentials: 'include'
+                    credentials: 'include',
+                    mode: 'cors',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
                 });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const data = await response.json();
                 csrfToken = data.token;
             } catch (error) {
@@ -207,9 +221,11 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRF-Token': csrfToken
+                        'X-CSRF-Token': csrfToken,
+                        'Accept': 'application/json'
                     },
                     credentials: 'include',
+                    mode: 'cors',
                     body: JSON.stringify({ email, password })
                 });
                 
@@ -218,45 +234,12 @@
                 
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('Login successful, user data:', data);
-                    
-                    // 等待一段时间，确保 cookie 已经设置
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    
-                    // 检查 cookie 是否设置成功
-                    console.log('All cookies after login:', document.cookie);
-                    
-                    // 在重定向之前先测试一下 categories 接口
-                    try {
-                        console.log('Testing categories API...');
-                        const testResponse = await fetch(`${API_BASE_URL}/categories`, {
-                            credentials: 'include',
-                            headers: {
-                                'Cookie': document.cookie
-                            }
-                        });
-                        console.log('Test categories response status:', testResponse.status);
-                        console.log('Test categories response headers:', [...testResponse.headers.entries()]);
-                        
-                        if (!testResponse.ok) {
-                            console.error('Categories API test failed with status:', testResponse.status);
-                            const errorData = await testResponse.json();
-                            console.error('Categories API error:', errorData);
-                        } else {
-                            const testData = await testResponse.json();
-                            console.log('Test categories data:', testData);
-                        }
-                    } catch (error) {
-                        console.error('Test categories request failed:', error);
-                    }
-                    
-                    // 使用完整的 URL 进行重定向
+                    console.log('Login successful, user role:', data.role);
+                    const baseUrl = window.location.origin;
                     if (data.isAdmin) {
-                        console.log('Redirecting to admin page...');
-                        window.location.href = 'http://20.189.115.243/admin.html';
+                        window.location.href = `${baseUrl}/admin.html`;
                     } else {
-                        console.log('Redirecting to home page...');
-                        window.location.href = 'http://20.189.115.243/index.html';
+                        window.location.href = `${baseUrl}/index.html`;
                     }
                 } else {
                     const error = await response.json();

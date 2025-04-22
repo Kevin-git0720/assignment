@@ -4,7 +4,12 @@
     <meta charset="UTF-8">
     <title>Admin Panel - Shopping Website</title>
     <!-- 添加 nonce 支持 -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'nonce-random123'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http://20.189.115.243:8081; connect-src 'self' http://20.189.115.243:8081;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; 
+        script-src 'self' 'nonce-random123' https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com; 
+        style-src 'self' 'unsafe-inline' https://www.paypal.com https://*.paypalobjects.com; 
+        img-src 'self' data: https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com; 
+        connect-src 'self' https://s29.iems5718.ie.cuhk.edu.hk https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com;
+        frame-src https://www.paypal.com https://*.paypal.com;">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -271,11 +276,16 @@
             <h2>Products</h2>
             <ul id="productList" class="list"></ul>
         </div>
+
+        <div class="admin-section">
+            <h2>Orders</h2>
+            <div id="orderList"></div>
+        </div>
     </div>
 
     <!-- 添加 nonce 属性 -->
     <script nonce="random123">
-        const API_BASE_URL = 'http://20.189.115.243:8081/api';
+        const API_BASE_URL = 'https://s29.iems5718.ie.cuhk.edu.hk/api';
         let csrfToken = '';
 
         // Check authentication status
@@ -295,7 +305,7 @@
                 if (!response.ok) {
                     const error = await response.json();
                     console.error('Auth check failed:', error);
-                    window.location.href = 'http://20.189.115.243/login.html';
+                    window.location.href = '/login.html';
                     return false;
                 }
                 
@@ -304,7 +314,7 @@
                 
                 if (!data.isAdmin) {
                     console.log('User is not admin, redirecting to index page...');
-                    window.location.href = 'http://20.189.115.243/index.html';
+                    window.location.href = '/index.html';
                     return false;
                 }
                 
@@ -312,7 +322,7 @@
                 return true;
             } catch (error) {
                 console.error('Auth check failed:', error);
-                window.location.href = 'http://20.189.115.243/login.html';
+                window.location.href = '/login.html';
                 return false;
             }
         }
@@ -744,6 +754,58 @@
             categoryForm.scrollIntoView({ behavior: 'smooth' });
         }
 
+        // 加载订单列表
+        async function loadOrders() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/admin/orders`, {
+                    credentials: 'include',
+                    headers: {
+                        'X-CSRF-Token': csrfToken
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load orders');
+                }
+
+                const orders = await response.json();
+                const orderList = document.getElementById('orderList');
+
+                if (orders.length === 0) {
+                    orderList.innerHTML = '<p>No orders found</p>';
+                    return;
+                }
+
+                orderList.innerHTML = orders.map(order => {
+                    const items = order.items || [];
+                    return `
+                        <div class="order-item">
+                            <h3>Order #${order.order_id}</h3>
+                            <p>Customer: ${escapeHTML(order.user_email)}</p>
+                            <p>Status: ${escapeHTML(order.payment_status)}</p>
+                            <p>Total: $${parseFloat(order.total_amount).toFixed(2)}</p>
+                            <p>Date: ${new Date(order.created_at).toLocaleString()}</p>
+                            <div class="order-items">
+                                <h4>Items:</h4>
+                                <ul>
+                                    ${items.map(item => `
+                                        <li>
+                                            Product ID: ${item.pid} |
+                                            Quantity: ${item.quantity} |
+                                            Price: $${parseFloat(item.price).toFixed(2)}
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading orders:', error);
+                document.getElementById('orderList').innerHTML = '<p>Error loading orders</p>';
+            }
+        }
+
         // Initialize
         async function init() {
             console.log('Initializing admin page...');
@@ -763,6 +825,7 @@
             console.log('CSRF token obtained, loading data...');
             await loadCategories();
             await loadProducts();
+            await loadOrders();
         }
 
         init();
