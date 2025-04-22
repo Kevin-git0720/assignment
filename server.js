@@ -342,7 +342,7 @@ app.post('/api/auth/change-password', authenticateToken, async (req, res) => {
     }
 });
 
-app.get('/api/categories', authenticateToken, checkAdmin, async (req, res) => {
+app.get('/api/categories', async (req, res) => {
     try {
         const [categories] = await connection.promise().query('SELECT * FROM categories');
         res.json(categories);
@@ -367,7 +367,7 @@ app.post('/api/categories', authenticateToken, checkAdmin, csrfProtection, async
     }
 });
 
-app.put('/api/categories/:catid', (req, res) => {
+app.put('/api/categories/:catid', authenticateToken, checkAdmin, csrfProtection, async (req, res) => {
   const { name } = req.body;
   if (!name) {
     res.status(400).json({ message: 'Category name is required' });
@@ -569,7 +569,7 @@ app.get('/api/cart/products', (req, res) => {
   );
 });
 
-app.get('/api/products', authenticateToken, checkAdmin, async (req, res) => {
+app.get('/api/products', async (req, res) => {
     try {
         const [products] = await connection.promise().query(
             'SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON p.catid = c.catid'
@@ -581,7 +581,7 @@ app.get('/api/products', authenticateToken, checkAdmin, async (req, res) => {
     }
 });
 
-app.get('/api/products/category/:catid', authenticateToken, async (req, res) => {
+app.get('/api/products/category/:catid', async (req, res) => {
   connection.query(
     'SELECT * FROM products WHERE catid = ?',
     [req.params.catid],
