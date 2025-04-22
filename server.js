@@ -603,41 +603,25 @@ const PAYPAL_API_BASE = 'https://api-m.sandbox.paypal.com';
 // PayPal IPN webhook
 app.post('/api/paypal-ipn', async (req, res) => {
     try {
-        const { orderID } = req.body;
-        console.log('Received PayPal webhook:', req.body);
+        const webhookData = req.body;
+        console.log('Received PayPal webhook:', webhookData);
 
-        const auth = await fetch(`${PAYPAL_API_BASE}/v1/oauth2/token`, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Accept-Language': 'en_US',
-                'Authorization': 'Basic ' + Buffer.from(PAYPAL_CLIENT_ID + ':' + PAYPAL_SECRET).toString('base64'),
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: 'grant_type=client_credentials'
-        });
-
-        const { access_token } = await auth.json();
-
-        const orderResponse = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders/${orderID}`, {
-            headers: {
-                'Authorization': `Bearer ${access_token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        const orderData = await orderResponse.json();
-        
-        if (orderData.status !== 'COMPLETED') {
-            console.error('Order not completed:', orderData);
-            return res.status(400).send('Order not completed');
+        if (webhookData.event_type !== 'PAYMENT.CAPTURE.COMPLETED') {
+            console.log('Ignoring non-capture event:', webhookData.event_type);
+            return res.status(200).send('OK');
         }
 
-        const customId = orderData.purchase_units[0].custom_id;
+        const captureId = webhookData.resource.id;
+        const orderId = webhookData.resource.custom_id;
+
+        if (!orderId) {
+            console.error('No order ID found in webhook data');
+            return res.status(400).send('No order ID found');
+        }
 
         await connection.promise().query(
             'UPDATE orders SET payment_status = "completed" WHERE order_id = ?',
-            [customId]
+            [orderId]
         );
 
         console.log('Order processed successfully');
