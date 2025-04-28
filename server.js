@@ -43,7 +43,7 @@ app.use(cookieParser());
 app.use(helmet());
 app.use(morgan('combined'));
 app.use(cors({
-    origin: ['http://20.189.115.243', 'https://20.189.115.243', 'https://s29.iems5718.ie.cuhk.edu.hk'],
+    origin: ['https://s29.iems5718.ie.cuhk.edu.hk'],
     credentials: true
 }));
 
@@ -683,6 +683,46 @@ app.get('/api/user/orders', authenticateToken, async (req, res) => {
     }
 });
 
+// 获取商品折扣信息
+app.get('/api/discounts/:pid', async (req, res) => {
+    try {
+        const [discounts] = await connection.promise().query(
+            'SELECT * FROM discounts WHERE product_id = ?',
+            [req.params.pid]
+        );
+        res.json(discounts);
+    } catch (error) {
+        console.error('Error fetching discounts:', error);
+        res.status(500).json({ message: '服务器错误' });
+    }
+});
+
+// 计算折扣价格
+function calculateDiscountedPrice(originalPrice, quantity, discounts) {
+    if (!discounts || discounts.length === 0) {
+        return originalPrice * quantity;
+    }
+
+    let bestPrice = originalPrice * quantity;
+    
+    for (const discount of discounts) {
+        if (quantity >= discount.condition_quantity) {
+            if (discount.discount_type === 'buy_x_get_y') {
+                const sets = Math.floor(quantity / (discount.condition_quantity + discount.discount_quantity));
+                const remaining = quantity % (discount.condition_quantity + discount.discount_quantity);
+                const discountedPrice = (sets * discount.condition_quantity + remaining) * originalPrice;
+                bestPrice = Math.min(bestPrice, discountedPrice);
+            } else if (discount.discount_type === 'bulk_price') {
+                const discountedPrice = quantity * discount.bulk_price;
+                bestPrice = Math.min(bestPrice, discountedPrice);
+            }
+        }
+    }
+
+    return bestPrice;
+}
+
+
 app.post('/api/validate-order', authenticateToken, async (req, res) => {
     try {
         const { items } = req.body;
@@ -703,22 +743,27 @@ app.post('/api/validate-order', authenticateToken, async (req, res) => {
                 return res.status(400).json({ error: `Product ${item.pid} not found` });
             }
 
+            const [discounts] = await connection.promise().query(
+                'SELECT * FROM discounts WHERE product_id = ?',
+                [item.pid]
+            );
+
             const price = parseFloat(products[0].price);
             const quantity = parseInt(item.quantity);
-            const itemTotal = price * quantity;
-            totalAmount += itemTotal;
+            const { finalPrice } = calculateDiscountedPrice(price, quantity, discounts);
+            totalAmount += finalPrice;
 
             orderItems.push({
                 pid: item.pid,
                 name: products[0].name,
                 quantity: quantity,
-                price: price
+                price: price,
+                finalPrice: finalPrice
             });
         }
 
         const orderData = {
             currency: 'USD',
-            // merchantEmail: PAYPAL_EMAIL,
             merchantEmail: userEmail,
             salt: Math.random().toString(36).substring(7),
             items: orderItems,

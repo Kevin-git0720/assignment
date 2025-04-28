@@ -203,38 +203,6 @@
         let csrfToken = '';
         let cart = JSON.parse(localStorage.getItem('cart')) || {};
 
-        // Check authentication status - commented out as per requirement
-        /*async function checkAuth() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/auth/check`, {
-                    credentials: 'include'
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    document.getElementById('userEmail').textContent = data.email;
-                    document.getElementById('loginLink').style.display = 'none';
-                    document.getElementById('logoutLink').style.display = 'inline';
-                    
-                    if (data.isAdmin) {
-                        const adminLink = document.createElement('a');
-                        adminLink.href = '/admin.html';
-                        adminLink.className = 'admin-link';
-                        adminLink.textContent = 'Admin Panel';
-                        document.querySelector('.user-info').appendChild(adminLink);
-                    }
-                } else {
-                    document.getElementById('userEmail').textContent = 'Guest';
-                    document.getElementById('loginLink').style.display = 'inline';
-                    document.getElementById('logoutLink').style.display = 'none';
-                }
-            } catch (error) {
-                console.error('Auth check failed:', error);
-                document.getElementById('userEmail').textContent = 'Guest';
-            }
-        }*/
-
-        // Get CSRF token
         async function getCsrfToken() {
             try {
                 const response = await fetch(`${API_BASE_URL}/auth/csrf`, {
@@ -247,24 +215,6 @@
             }
         }
 
-        // Logout - commented out as per requirement
-        /*document.getElementById('logoutLink').addEventListener('click', async (e) => {
-            e.preventDefault();
-            try {
-                await fetch(`${API_BASE_URL}/auth/logout`, {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: {
-                        'X-CSRF-Token': csrfToken
-                    }
-                });
-                window.location.reload();
-            } catch (error) {
-                console.error('Logout failed:', error);
-            }
-        });*/
-
-        // Modify all API requests to include CSRF token
         async function makeAuthenticatedRequest(url, options = {}) {
             const defaultOptions = {
                 credentials: 'include',
@@ -312,15 +262,6 @@
                     throw new Error('Product not found');
                 }
                 const product = await response.json();
-                
-                // document.getElementById('productImage').src = escapeHTML(product.image_path);
-                // document.getElementById('productName').textContent = escapeHTML(product.name);
-                // document.getElementById('productPrice').textContent = `$${escapeHTML(product.price)}`;
-                // document.getElementById('productDescription').textContent = escapeHTML(product.description);
-                
-                // // Update add to cart button
-                // const addToCartBtn = document.getElementById('addToCartBtn');
-                // addToCartBtn.onclick = () => addToCart(product);
 
 
                 // Update navigation
@@ -381,9 +322,7 @@
             }
         }
 
-        // Add to cart
-        function addToCart(product, quantity = 1) {
-            console.log('Adding to cart:', product, 'Quantity:', quantity);
+        function addToCart(product) {
             if (!cart[product.pid]) {
                 cart[product.pid] = {
                     pid: product.pid,
@@ -392,73 +331,123 @@
                     quantity: 0
                 };
             }
-            cart[product.pid].quantity += quantity;
-            console.log('Updated cart:', cart);
-            updateCart();
-            // 添加视觉反馈
+            cart[product.pid].quantity++;
+            
+            // 立即获取折扣信息并更新显示
+            fetch(`/api/discounts/${product.pid}`)
+                .then(response => response.json())
+                .then(discounts => {
+                    const finalPrice = calculateDiscountedPrice(product.price, cart[product.pid].quantity, discounts);
+                    cart[product.pid].finalPrice = finalPrice;
+                    updateCart();
+                });
+            
             alert('Product added to cart!');
         }
 
-        function updateCart() {
-            console.log('Updating cart display');
+        async function updateCart() {
             const cartItems = document.getElementById('cartItems');
-            const items = Object.values(cart).filter(item => item && item.quantity > 0);
-            console.log('Cart items:', items);
-            
-            if (items.length === 0) {
-                cartItems.innerHTML = '<div class="empty-cart">Your cart is empty</div>';
-                document.getElementById('cartTotal').textContent = 'Total: $0.00';
-                document.getElementById('paypal-button-container').innerHTML = '';
-                localStorage.setItem('cart', JSON.stringify({}));
-                return;
-            }
-            
-            cartItems.innerHTML = items.map(item => `
-                <div class="cart-item" data-pid="${item.pid}">
-                    <div class="cart-item-details">
-                        <h4>${escapeHTML(item.name)}</h4>
-                        <p>$${item.price}</p>
-                        <div class="quantity-controls">
-                            <button class="quantity-decrease">-</button>
-                            <span>${item.quantity}</span>
-                            <button class="quantity-increase">+</button>
+            const cartTotal = document.getElementById('cartTotal');
+            let total = 0;
+            let html = '';
+
+            for (const pid in cart) {
+                const item = cart[pid];
+                if (item.quantity > 0) {
+                    const discounts = await fetch(`/api/discounts/${pid}`).then(r => r.json());
+                    const finalPrice = calculateDiscountedPrice(item.price, item.quantity, discounts);
+                    total += finalPrice;
+
+                    html += `
+                        <div class="cart-item" data-pid="${pid}">
+                            <div class="cart-item-details">
+                                <h4>${item.name}</h4>
+                                <div class="quantity-controls">
+                                    <button class="quantity-decrease">-</button>
+                                    <span>${item.quantity}</span>
+                                    <button class="quantity-increase">+</button>
+                                </div>                                
+                                <p>
+                                    $${finalPrice.toFixed(2)}
+                                    ${finalPrice < item.price * item.quantity ? 
+                                        `<small>(原价: $${(item.price * item.quantity).toFixed(2)})</small>` : 
+                                        ''}
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                </div>
-            `).join('');
-            
-            // 添加事件监听器
-            cartItems.querySelectorAll('.quantity-decrease').forEach(button => {
+                    `;
+                }
+            }
+
+            cartItems.innerHTML = html || '<div class="empty-cart">Your cart is empty</div>';
+            cartTotal.textContent = `Total: $${total.toFixed(2)}`;
+            localStorage.setItem('cart', JSON.stringify(cart));
+
+            // 在更新HTML后添加事件监听器
+            document.querySelectorAll('.quantity-decrease').forEach(button => {
                 button.addEventListener('click', (e) => {
                     const pid = e.target.closest('.cart-item').dataset.pid;
                     updateQuantity(pid, -1);
                 });
             });
             
-            cartItems.querySelectorAll('.quantity-increase').forEach(button => {
+            document.querySelectorAll('.quantity-increase').forEach(button => {
                 button.addEventListener('click', (e) => {
                     const pid = e.target.closest('.cart-item').dataset.pid;
                     updateQuantity(pid, 1);
                 });
             });
-            
-            const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-            document.getElementById('cartTotal').textContent = `Total: $${total}`;
-            
-            // 初始化PayPal按钮
-            initPayPalButton();
-            
-            localStorage.setItem('cart', JSON.stringify(cart));
         }
 
         function updateQuantity(pid, change) {
             if (!cart[pid]) return;
             
-            cart[pid].quantity += change;
-            if (cart[pid].quantity <= 0) {
+            const newQuantity = cart[pid].quantity + change;
+            if (newQuantity < 0) return;
+            
+            cart[pid].quantity = newQuantity;
+            
+            // 如果数量为0，从购物车中移除
+            if (newQuantity === 0) {
                 delete cart[pid];
             }
-            updateCart();
+            
+            // 获取最新的折扣信息并更新价格
+            fetch(`${API_BASE_URL}/discounts/${pid}`)
+                .then(response => response.json())
+                .then(discounts => {
+                    const finalPrice = calculateDiscountedPrice(cart[pid].price, newQuantity, discounts);
+                    cart[pid].finalPrice = finalPrice;
+                    updateCart();
+                })
+                .catch(error => {
+                    console.error('Error fetching discounts:', error);
+                    updateCart();
+                });
+        }
+
+        function calculateDiscountedPrice(originalPrice, quantity, discounts) {
+            if (!discounts || discounts.length === 0) {
+                return originalPrice * quantity;
+            }
+
+            let bestPrice = originalPrice * quantity;
+            
+            for (const discount of discounts) {
+                if (quantity >= discount.condition_quantity) {
+                    if (discount.discount_type === 'buy_x_get_y') {
+                        const sets = Math.floor(quantity / (discount.condition_quantity + discount.discount_quantity));
+                        const remaining = quantity % (discount.condition_quantity + discount.discount_quantity);
+                        const discountedPrice = (sets * discount.condition_quantity + remaining) * originalPrice;
+                        bestPrice = Math.min(bestPrice, discountedPrice);
+                    } else if (discount.discount_type === 'bulk_price') {
+                        const discountedPrice = quantity * discount.bulk_price;
+                        bestPrice = Math.min(bestPrice, discountedPrice);
+                    }
+                }
+            }
+
+            return bestPrice;
         }
 
         // PayPal按钮初始化
@@ -541,7 +530,6 @@
 
         // Initialize
         async function init() {
-            // await checkAuth(); // Commented out authentication check
             await getCsrfToken();
             loadProductDetails();
             updateCart();
