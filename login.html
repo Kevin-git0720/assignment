@@ -227,13 +227,10 @@
                     mode: 'cors',
                     body: JSON.stringify({ email, password })
                 });
-                
-                console.log('Login response status:', response.status);
-                console.log('Response headers:', [...response.headers.entries()]);
+            
                 
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('Login successful, user role:', data.role);
                     const baseUrl = window.location.origin;
                     if (data.isAdmin) {
                         window.location.href = `${baseUrl}/admin.html`;
@@ -242,11 +239,9 @@
                     }
                 } else {
                     const error = await response.json();
-                    console.error('Login failed with error:', error);
                     showError('emailError', error.message || 'Login failed. Please try again.');
                 }
             } catch (error) {
-                console.error('Login request failed:', error);
                 showError('emailError', 'Login failed. Please try again.');
             }
         });
@@ -358,7 +353,6 @@
                     showError('currentPasswordError', error.message || 'Failed to change password');
                 }
             } catch (error) {
-                console.error('Password change failed:', error);
                 showError('currentPasswordError', 'Failed to change password. Please try again.');
             }
         });

@@ -350,7 +350,6 @@
 
         async function checkAuth() {
             try {
-                console.log('Checking authentication...');
                 const response = await fetch(`${API_BASE_URL}/auth/check`, {
                     credentials: 'include',
                     headers: {
@@ -358,21 +357,16 @@
                     }
                 });
                 
-                console.log('Auth check response status:', response.status);
-                console.log('Auth check response headers:', [...response.headers.entries()]);
                 
                 if (!response.ok) {
                     const error = await response.json();
-                    console.error('Auth check failed:', error);
                     window.location.href = '/login.html';
                     return false;
                 }
                 
                 const data = await response.json();
-                console.log('Auth check successful, user data:', data);
-                
+
                 if (!data.isAdmin) {
-                    console.log('User is not admin, redirecting to index page...');
                     window.location.href = '/index.html';
                     return false;
                 }
@@ -380,7 +374,6 @@
                 document.getElementById('userEmail').textContent = data.email;
                 return true;
             } catch (error) {
-                console.error('Auth check failed:', error);
                 window.location.href = '/login.html';
                 return false;
             }
@@ -462,18 +455,14 @@
 
         async function loadCategories() {
             try {
-                console.log('Sending request to load categories...');
                 const response = await makeAuthenticatedRequest(`${API_BASE_URL}/categories`);
-                console.log('Categories response status:', response.status);
                 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    console.error('Failed to load categories:', errorData);
                     throw new Error(errorData.message || 'Failed to load categories');
                 }
                 
                 const categories = await response.json();
-                console.log('Categories loaded:', categories);
                 
 
                 const categorySelect = document.getElementById('productCategory');
@@ -505,7 +494,6 @@
                     item.querySelector('.delete-btn').addEventListener('click', () => deleteCategory(catid));
                 });
             } catch (error) {
-                console.error('Failed to load categories:', error);
                 alert('Failed to load categories: ' + error.message);
             }
         }
@@ -513,7 +501,6 @@
 
         async function loadProducts() {
             try {
-                console.log('Loading products by categories...');
 
                 const categoriesResponse = await makeAuthenticatedRequest(`${API_BASE_URL}/categories`);
                 if (!categoriesResponse.ok) {
@@ -533,7 +520,6 @@
                 
 
                 const categoryProducts = await Promise.all(productPromises);
-                console.log('Products loaded by categories:', categoryProducts);
                 
 
                 const productList = document.getElementById('productList');
@@ -576,7 +562,6 @@
                     productList.innerHTML = '<li class="list-item">No products available</li>';
                 }
             } catch (error) {
-                console.error('Failed to load products:', error);
                 alert('Failed to load products: ' + error.message);
             }
         }
@@ -631,7 +616,6 @@
                     document.getElementById('categoryNameError').style.display = 'block';
                 }
             } catch (error) {
-                console.error('Failed to save category:', error);
                 document.getElementById('categoryNameError').textContent = 'Failed to save category';
                 document.getElementById('categoryNameError').style.display = 'block';
             }
@@ -712,7 +696,6 @@
                     document.getElementById('productNameError').style.display = 'block';
                 }
             } catch (error) {
-                console.error('Failed to add product:', error);
                 document.getElementById('productNameError').textContent = 'Failed to add product';
                 document.getElementById('productNameError').style.display = 'block';
             }
@@ -737,7 +720,6 @@
                     alert(error.message || 'Failed to delete category');
                 }
             } catch (error) {
-                console.error('Failed to delete category:', error);
                 alert('Failed to delete category');
             }
         }
@@ -866,21 +848,16 @@
 
 
         async function init() {
-            console.log('Initializing admin page...');
             const isAuthenticated = await checkAuth();
             if (!isAuthenticated) {
-                console.log('Authentication failed, stopping initialization');
                 return;
             }
             
-            console.log('Authentication successful, getting CSRF token...');
             const hasToken = await getCsrfToken();
             if (!hasToken) {
-                console.error('Failed to initialize: Could not get CSRF token');
                 return;
             }
             
-            console.log('CSRF token obtained, loading data...');
             await loadCategories();
             await loadProducts();
             await loadOrders();

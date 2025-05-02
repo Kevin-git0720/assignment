@@ -483,7 +483,6 @@
             paypal.Buttons({
                 createOrder: async function(data, actions) {
                     try {
-                        console.log('开始创建PayPal订单...');
                         const items = Object.values(cart).filter(item => item && item.quantity > 0);
                         
                         if (items.length === 0) {
@@ -514,7 +513,6 @@
                         }
 
                         const data = await response.json();
-                        console.log('订单验证成功:', data);
 
 
                         return actions.order.create({
@@ -534,9 +532,7 @@
                 },
                 onApprove: async function(data, actions) {
                     try {
-                        console.log('PayPal订单已批准:', data);
                         const order = await actions.order.capture();
-                        console.log('订单已完成:', order);
                         
 
                         cart = {};
