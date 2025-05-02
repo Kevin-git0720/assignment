@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Admin Panel - Shopping Website</title>
-    <!-- 添加 nonce 支持 -->
+
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; 
         script-src 'self' 'nonce-random123' https://www.paypal.com https://*.paypal.com https://*.paypalobjects.com; 
         style-src 'self' 'unsafe-inline' https://www.paypal.com https://*.paypalobjects.com; 
@@ -207,6 +207,49 @@
             display: flex;
             gap: 10px;
         }
+
+        /* 添加拖拽区域样式 */
+        .drop-zone {
+            width: 300px;
+            height: 200px;
+            border: 2px dashed #ccc;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            margin: 20px 0;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+
+        .drop-zone.dragover {
+            border-color: #007bff;
+            background-color: rgba(0, 123, 255, 0.1);
+        }
+
+        .drop-zone p {
+            margin: 10px 0;
+            color: #666;
+        }
+
+        .preview-container {
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .preview-image {
+            max-width: 200px;
+            max-height: 200px;
+            display: none;
+            margin: 10px auto;
+        }
+
+        .error-message {
+            color: #dc3545;
+            margin-top: 5px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -259,7 +302,15 @@
                 </div>
                 <div class="form-group">
                     <label for="productImage">Image:</label>
-                    <input type="file" id="productImage" accept="image/*" required>
+                    <div class="drop-zone" id="dropZone">
+                        <p>Drag and drop image here</p>
+                        <p>or click to select image</p>
+                        <input type="file" id="productImage" accept="image/*" style="display: none;">
+                        <div class="preview-container">
+                            <img id="previewImage" class="preview-image" alt="Preview">
+                            <p id="errorMessage" class="error-message"></p>
+                        </div>
+                    </div>
                     <div class="error-message" id="productImageError"></div>
                 </div>
                 <button type="submit">Add Product</button>
@@ -283,12 +334,12 @@
         </div>
     </div>
 
-    <!-- 添加 nonce 属性 -->
+
     <script nonce="random123">
         const API_BASE_URL = 'https://s29.iems5718.ie.cuhk.edu.hk/api';
         let csrfToken = '';
 
-        // Check authentication status
+
         async function checkAuth() {
             try {
                 console.log('Checking authentication...');
@@ -327,7 +378,7 @@
             }
         }
 
-        // Get CSRF token
+
         async function getCsrfToken() {
             try {
                 const response = await fetch(`${API_BASE_URL}/auth/csrf`, {
@@ -342,7 +393,7 @@
             }
         }
 
-        // Logout
+
         document.getElementById('logoutBtn').addEventListener('click', async () => {
             try {
                 await fetch(`${API_BASE_URL}/auth/logout`, {
@@ -358,7 +409,7 @@
             }
         });
 
-        // Modify all API requests to include CSRF token
+
         async function makeAuthenticatedRequest(url, options = {}) {
             const defaultOptions = {
                 credentials: 'include',
@@ -367,10 +418,10 @@
                 }
             };
 
-            // 确保在所有非 GET 请求中添加 CSRF token
+
             if (options.method && options.method !== 'GET') {
                 if (!csrfToken) {
-                    // 如果没有 CSRF token，重新获取
+
                     await getCsrfToken();
                 }
                 defaultOptions.headers['X-CSRF-Token'] = csrfToken;
@@ -400,7 +451,7 @@
                       .replace(/'/g, '&#039;');
         }
 
-        // Load categories
+
         async function loadCategories() {
             try {
                 console.log('Sending request to load categories...');
@@ -416,14 +467,14 @@
                 const categories = await response.json();
                 console.log('Categories loaded:', categories);
                 
-                // Update category select
+
                 const categorySelect = document.getElementById('productCategory');
                 categorySelect.innerHTML = '<option value="">Select a category</option>' +
                     categories.map(cat => `
                         <option value="${escapeHTML(cat.catid)}">${escapeHTML(cat.name)}</option>
                     `).join('');
                 
-                // Update category list
+
                 const categoryList = document.getElementById('categoryList');
                 categoryList.innerHTML = categories.map(cat => `
                     <li class="list-item" data-catid="${cat.catid}">
@@ -451,18 +502,18 @@
             }
         }
 
-        // Load products
+
         async function loadProducts() {
             try {
                 console.log('Loading products by categories...');
-                // 先获取所有分类
+
                 const categoriesResponse = await makeAuthenticatedRequest(`${API_BASE_URL}/categories`);
                 if (!categoriesResponse.ok) {
                     throw new Error('Failed to load categories');
                 }
                 const categories = await categoriesResponse.json();
                 
-                // 存储所有商品的 Promise
+
                 const productPromises = categories.map(category => 
                     makeAuthenticatedRequest(`${API_BASE_URL}/products/category/${category.catid}`)
                         .then(response => response.json())
@@ -472,11 +523,11 @@
                         }))
                 );
                 
-                // 等待所有商品加载完成
+
                 const categoryProducts = await Promise.all(productPromises);
                 console.log('Products loaded by categories:', categoryProducts);
                 
-                // 更新产品列表
+
                 const productList = document.getElementById('productList');
                 productList.innerHTML = categoryProducts.map(({ category, products }) => `
                     ${products.length > 0 ? `
@@ -504,7 +555,7 @@
                     ` : ''}
                 `).join('');
 
-                // 添加产品事件监听器
+
                 productList.querySelectorAll('.list-item[data-pid]').forEach(item => {
                     const pid = item.dataset.pid;
                     
@@ -512,7 +563,7 @@
                     item.querySelector('.delete-btn')?.addEventListener('click', () => deleteProduct(pid));
                 });
                 
-                // 如果没有任何商品，显示提示信息
+
                 if (productList.innerHTML.trim() === '') {
                     productList.innerHTML = '<li class="list-item">No products available</li>';
                 }
@@ -522,7 +573,7 @@
             }
         }
 
-        // Add category
+
         document.getElementById('categoryForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -542,7 +593,7 @@
                     `${API_BASE_URL}/categories/${categoryId}` : 
                     `${API_BASE_URL}/categories`;
                 
-                // 确保在发送请求前已经获取到了 CSRF token
+
                 if (!csrfToken) {
                     await getCsrfToken();
                 }
@@ -578,7 +629,7 @@
             }
         });
 
-        // Add product
+
         document.getElementById('productForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -588,12 +639,10 @@
             const categoryId = document.getElementById('productCategory').value;
             const imageFile = document.getElementById('productImage').files[0];
             
-            // Reset error messages
             document.querySelectorAll('.error-message').forEach(el => {
                 el.style.display = 'none';
             });
             
-            // Validate inputs
             let isValid = true;
             
             if (!name) {
@@ -645,6 +694,7 @@
                 
                 if (response.ok) {
                     document.getElementById('productForm').reset();
+                    document.getElementById('previewImage').style.display = 'none';
                     document.getElementById('productSuccess').textContent = 'Product added successfully';
                     document.getElementById('productSuccess').style.display = 'block';
                     loadProducts();
@@ -660,7 +710,7 @@
             }
         });
 
-        // Delete category
+
         async function deleteCategory(catid) {
             if (!confirm('Are you sure you want to delete this category? All products in this category will also be deleted.')) {
                 return;
@@ -684,7 +734,7 @@
             }
         }
 
-        // Delete product
+
         async function deleteProduct(pid) {
             if (!confirm('Are you sure you want to delete this product?')) {
                 return;
@@ -716,22 +766,22 @@
                 }
                 const product = await response.json();
                 
-                // 填充表单
+
                 document.getElementById('productName').value = product.name;
                 document.getElementById('productPrice').value = product.price;
                 document.getElementById('productDescription').value = product.description;
                 document.getElementById('productCategory').value = product.catid;
                 
-                // 修改提交按钮和表单行为
+
                 const form = document.getElementById('productForm');
                 const submitButton = form.querySelector('button[type="submit"]');
                 submitButton.textContent = 'Update Product';
                 
-                // 存储产品ID用于更新
+
                 form.dataset.editMode = 'true';
                 form.dataset.editId = pid;
                 
-                // 滚动到表单
+
                 form.scrollIntoView({ behavior: 'smooth' });
             } catch (error) {
                 console.error('Failed to load product details:', error);
@@ -739,7 +789,7 @@
             }
         }
 
-        // Add category edit function
+
         async function editCategory(catid, name) {
             const categoryName = document.getElementById('categoryName');
             const categoryForm = document.getElementById('categoryForm');
@@ -750,11 +800,11 @@
             categoryForm.dataset.editId = catid;
             submitButton.textContent = 'Update Category';
             
-            // 滚动到表单
+
             categoryForm.scrollIntoView({ behavior: 'smooth' });
         }
 
-        // 加载订单列表
+
         async function loadOrders() {
             try {
                 const response = await fetch(`${API_BASE_URL}/admin/orders`, {
@@ -806,7 +856,7 @@
             }
         }
 
-        // Initialize
+
         async function init() {
             console.log('Initializing admin page...');
             const isAuthenticated = await checkAuth();
@@ -829,6 +879,73 @@
         }
 
         init();
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('productImage');
+            const previewImage = document.getElementById('previewImage');
+            const errorMessage = document.getElementById('errorMessage');
+
+
+            dropZone.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', handleFileSelect);
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFile(files[0]);
+                }
+            });
+
+            function handleFileSelect(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    handleFile(file);
+                }
+            }
+
+            function handleFile(file) {
+
+                if (!file.type.startsWith('image/')) {
+                    showError('Please select an image file');
+                    return;
+                }
+
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImage.src = e.target.result;
+                    previewImage.style.display = 'block';
+                    errorMessage.style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+
+
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                fileInput.files = dataTransfer.files;
+            }
+
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+                previewImage.style.display = 'none';
+            }
+        });
     </script>
 </body>
 </html>

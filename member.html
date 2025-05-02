@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Member Portal - Orders</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .user-info {
+            text-align: right;
+            margin-bottom: 20px;
+        }
+        .order-list {
+            margin-top: 20px;
+        }
+        .order-item {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .order-items {
+            margin-top: 10px;
+        }
+        .order-item-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+        }
+        .order-total {
+            text-align: right;
+            margin-top: 10px;
+            font-weight: bold;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+        .logout-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .logout-btn:hover {
+            background-color: #c82333;
+        }
+        .error-message {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 15px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="user-info">
+            <span id="userEmail"></span>
+            <button class="logout-btn" id="logoutBtn">Logout</button>
+        </div>
+        
+        <h1>My Orders</h1>
+        
+        <div class="error-message" id="errorMessage"></div>
+        
+        <div class="order-list" id="orderList">
+            <!-- Orders will be loaded here -->
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://s29.iems5718.ie.cuhk.edu.hk/api';
+        let csrfToken = '';
+
+        async function getCsrfToken() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/csrf`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                csrfToken = data.token;
+            } catch (error) {
+                console.error('Failed to get CSRF token:', error);
+            }
+        }
+
+        async function makeAuthenticatedRequest(url, options = {}) {
+            const defaultOptions = {
+                credentials: 'include',
+                headers: {
+                    'X-CSRF-Token': csrfToken,
+                    ...options.headers
+                }
+            };
+
+            const response = await fetch(url, { ...defaultOptions, ...options });
+            return response;
+        }
+
+        function showError(message) {
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        function hideError() {
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.style.display = 'none';
+        }
+
+        async function loadOrders() {
+            try {
+                console.log('Loading orders...');
+                const response = await makeAuthenticatedRequest(`${API_BASE_URL}/user/orders`);
+                console.log('Orders response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Failed to load orders:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        error: errorData
+                    });
+                    throw new Error('Failed to load orders');
+                }
+                
+                const orders = await response.json();
+                console.log('Orders data:', orders);
+                
+                const orderList = document.getElementById('orderList');
+                
+                if (orders.length === 0) {
+                    console.log('No orders found');
+                    orderList.innerHTML = '<p>No orders found</p>';
+                    return;
+                }
+
+                // 只显示最近的5个订单
+                const recentOrders = orders.slice(0, 5);
+                console.log('Recent orders:', recentOrders);
+
+                orderList.innerHTML = recentOrders.map(order => `
+                    <div class="order-item">
+                        <div class="order-header">
+                            <div>
+                                <strong>Order #${order.order_id}</strong>
+                                <br>
+                                <small>${new Date(order.created_at).toLocaleString()}</small>
+                            </div>
+                            <div>
+                                Status: ${order.payment_status}
+                            </div>
+                        </div>
+                        <div class="order-items">
+                            ${(order.items || []).map(item => `
+                                <div class="order-item-row">
+                                    <div>${item.name} x ${item.quantity}</div>
+                                    <div>$${(item.price * item.quantity).toFixed(2)}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="order-total">
+                            Total: $${order.total_amount}
+                        </div>
+                    </div>
+                `).join('');
+
+                // 如果订单总数超过5个，显示提示信息
+                if (orders.length > 5) {
+                    orderList.innerHTML += `
+                        <div class="order-item">
+                            <p style="text-align: center; color: #666;">
+                                Showing 5 most recent orders out of ${orders.length} total orders
+                            </p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error in loadOrders:', {
+                    message: error.message,
+                    stack: error.stack
+                });
+                showError('Failed to load orders. Please try again.');
+            }
+        }
+
+        async function checkAuth() {
+            try {
+                console.log('Checking authentication...');
+                const response = await fetch(`${API_BASE_URL}/auth/check`, {
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                console.log('Auth check response status:', response.status);
+                console.log('Auth check response headers:', [...response.headers.entries()]);
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    console.error('Auth check failed:', error);
+                    window.location.href = '/login.html';
+                    return false;
+                }
+                
+                const data = await response.json();
+                console.log('Auth check successful, user data:', data);
+                
+                // if (!data.isAdmin) {
+                //     console.log('User is not admin, redirecting to index page...');
+                //     window.location.href = '/index.html';
+                //     return false;
+                // }
+                
+                document.getElementById('userEmail').textContent = data.email;
+                return true;
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                window.location.href = '/login.html';
+                return false;
+            }
+        }
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try {
+                const response = await makeAuthenticatedRequest(`${API_BASE_URL}/auth/logout`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    window.location.href = '/member_login.html';
+                } else {
+                    showError('Failed to logout. Please try again.');
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+                showError('Failed to logout. Please try again.');
+            }
+        });
+
+        async function init() {
+            await getCsrfToken();
+            const isAuthenticated = await checkAuth();
+            if (isAuthenticated) {
+                loadOrders();
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html> 

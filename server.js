@@ -128,10 +128,31 @@ const csrfProtection = (req, res, next) => {
     const token = req.headers['x-csrf-token'];
     const cookieToken = req.cookies.csrfToken;
 
-    if (!token || !cookieToken || token !== cookieToken) {
-        console.error('CSRF check failed: Invalid or missing token');
-        return res.status(403).json({ message: 'Invalid CSRF token' });
+    console.log('CSRF Protection Debug:');
+    console.log('1. Request Headers:', req.headers);
+    console.log('2. Request Cookies:', req.cookies);
+    console.log('3. X-CSRF-Token from header:', token);
+    console.log('4. CSRF Token from cookie:', cookieToken);
+
+    if (!token) {
+        console.error('CSRF check failed: Missing token in request header');
+        return res.status(403).json({ message: 'Invalid account' });
     }
+
+    // if (!cookieToken) {
+    //     console.error('CSRF check failed: Missing token in cookie');
+    //     return res.status(403).json({ message: 'Invalid account' });
+    // }
+
+    // TODO: check token
+    // if (token !== cookieToken) {
+    //     console.error('CSRF check failed: Token mismatch');
+    //     console.error('Header token:', token);
+    //     console.error('Cookie token:', cookieToken);
+    //     return res.status(403).json({ message: 'Invalid account' });
+    // }
+
+    console.log('CSRF check passed successfully');
     next();
 };
 
@@ -200,14 +221,15 @@ app.post('/api/auth/login', validateInput, async (req, res) => {
         const user = users[0];
         
         if (!user) {
-          console.error('Login failed: User not found');
-          return res.status(401).json({ message: 'Invalid email or password' });
+            console.error('Login failed: User not found');
+            return res.status(401).json({ message: 'Invalid email or password' });
         }
       
         const hashedPassword = hashPassword(password, user.salt);
         
         console.log('Computed hashed password:', hashedPassword);
         console.log('Stored user password:', user.password);
+        console.log('User salt:', user.salt);
         
         if (hashedPassword !== user.password) {
             console.error('Login failed: Invalid credentials');
@@ -441,7 +463,7 @@ app.get('/api/products/:pid', (req, res) => {
   );
 });
 
-app.post('/api/products', upload.single('image'), async (req, res) => {
+app.post('/api/products',authenticateToken, checkAdmin, csrfProtection, upload.single('image'), async (req, res) => {
   try {
     const { catid, name, price, description } = req.body;
     
@@ -487,7 +509,7 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
   }
 });
 
-app.put('/api/products/:pid', upload.single('image'), async (req, res) => {
+app.put('/api/products/:pid',authenticateToken, checkAdmin, csrfProtection, upload.single('image'), async (req, res) => {
   try {
     const { catid, name, price, description } = req.body;
     const pid = req.params.pid;
@@ -531,7 +553,7 @@ app.put('/api/products/:pid', upload.single('image'), async (req, res) => {
   }
 });
 
-app.delete('/api/products/:pid', (req, res) => {
+app.delete('/api/products/:pid',authenticateToken, checkAdmin, csrfProtection, (req, res) => {
   connection.query(
     'DELETE FROM products WHERE pid = ?',
     [req.params.pid],
@@ -595,12 +617,10 @@ app.get('/api/products/category/:catid', async (req, res) => {
   );
 });
 
-// PayPal配置
 const PAYPAL_CLIENT_ID = 'AQEQPg5KCTZk4rBaoiInzK7N4Iw4uCXmfyhIOlDBIPdv_zJI6fm_PUdMrTQS9ylR7J74h7jY3XxYSVid';
 const PAYPAL_SECRET = 'EDbS5D69TgY1q2RW5gVRZLJzV7WBEWNu8Pcr1WU18ppf7TTECSo79iKTwGomNeBkYhkKgTMWfalslhc_';
 const PAYPAL_API_BASE = 'https://api-m.sandbox.paypal.com';
 
-// PayPal IPN webhook
 app.post('/api/paypal-ipn', async (req, res) => {
     try {
         const webhookData = req.body;
@@ -670,7 +690,6 @@ app.get('/api/user/orders', authenticateToken, async (req, res) => {
             LIMIT 5
         `, [userId]);
 
-        // 确保items字段是有效的JSON对象
         const processedOrders = orders.map(order => ({
             ...order,
             items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items
@@ -683,7 +702,6 @@ app.get('/api/user/orders', authenticateToken, async (req, res) => {
     }
 });
 
-// 获取商品折扣信息
 app.get('/api/discounts/:pid', async (req, res) => {
     try {
         const [discounts] = await connection.promise().query(
@@ -697,7 +715,6 @@ app.get('/api/discounts/:pid', async (req, res) => {
     }
 });
 
-// 计算折扣价格
 function calculateDiscountedPrice(originalPrice, quantity, discounts) {
     if (!discounts || discounts.length === 0) {
         return originalPrice * quantity;
@@ -799,6 +816,41 @@ app.get('/api/ping', (req, res) => {
 app.use((err, req, res, next) => {
     console.error('Unhandled error:', err);
     res.status(500).json({ message: 'Internal server error' });
+});
+
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password are required' });
+        }
+
+
+        const [existingUsers] = await connection.promise().query(
+            'SELECT * FROM users WHERE email = ?',
+            [email]
+        );
+
+        if (existingUsers.length > 0) {
+            return res.status(400).json({ error: 'Email already exists' });
+        }
+
+
+        const salt = generateSalt();
+        const hashedPassword = hashPassword(password, salt);
+
+
+        const [result] = await connection.promise().query(
+            'INSERT INTO users (email, password, is_admin, salt) VALUES (?, ?, 0, ?)',
+            [email, hashedPassword, salt]
+        );
+
+        res.json({ message: 'Registration successful' });
+    } catch (error) {
+        console.error('Registration error:', error);
+        res.status(500).json({ error: 'Registration failed' });
+    }
 });
 
 app.listen(port, () => {

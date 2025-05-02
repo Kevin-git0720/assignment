@@ -254,31 +254,31 @@
                     <a href="#" class="category-link" data-catid="${escapeHTML(cat.catid)}">${escapeHTML(cat.name)}</a>
                 `).join('');
 
-                // 添加事件监听器
+
                 document.querySelectorAll('.category-link').forEach(link => {
                     link.addEventListener('click', (e) => {
                         e.preventDefault();
                         const catid = e.target.dataset.catid;
                         
-                        // 更新 URL
+
                         const url = new URL(window.location);
                         url.searchParams.set('catid', catid);
                         window.history.pushState({}, '', url);
                         
-                        // 加载产品
+
                         loadProducts(catid);
                         
-                        // 更新导航菜单
+
                         document.getElementById('navMenu').innerHTML = `
                             <a href="index.html">Home</a> &gt;
                             <span>${e.target.textContent}</span>
                         `;
                         
-                        // 移除其他链接的活动状态
+
                         document.querySelectorAll('.category-link').forEach(link => {
                             link.classList.remove('active');
                         });
-                        // 添加当前链接的活动状态
+
                         e.target.classList.add('active');
                     });
                 });
@@ -361,7 +361,7 @@
             }
             cart[product.pid].quantity++;
             
-            // 立即获取折扣信息并更新显示
+
             fetch(`/api/discounts/${product.pid}`)
                 .then(response => response.json())
                 .then(discounts => {
@@ -411,7 +411,7 @@
             cartTotal.textContent = `Total: $${total.toFixed(2)}`;
             localStorage.setItem('cart', JSON.stringify(cart));
 
-            // 在更新HTML后添加事件监听器
+
             document.querySelectorAll('.quantity-decrease').forEach(button => {
                 button.addEventListener('click', (e) => {
                     const pid = e.target.closest('.cart-item').dataset.pid;
@@ -435,12 +435,12 @@
             
             cart[pid].quantity = newQuantity;
             
-            // 如果数量为0，从购物车中移除
+
             if (newQuantity === 0) {
                 delete cart[pid];
             }
             
-            // 获取最新的折扣信息并更新价格
+
             fetch(`${API_BASE_URL}/discounts/${pid}`)
                 .then(response => response.json())
                 .then(discounts => {
@@ -478,7 +478,7 @@
             return bestPrice;
         }
 
-        // PayPal按钮初始化
+
         function initPayPalButton() {
             paypal.Buttons({
                 createOrder: async function(data, actions) {
@@ -492,7 +492,7 @@
                             return;
                         }
 
-                        // 发送订单验证请求
+
                         console.log('发送订单验证请求...');
                         const response = await fetch(`${API_BASE_URL}/validate-order`, {
                             method: 'POST',
@@ -516,7 +516,7 @@
                         const data = await response.json();
                         console.log('订单验证成功:', data);
 
-                        // 创建PayPal订单
+
                         return actions.order.create({
                             purchase_units: [{
                                 amount: {
@@ -538,7 +538,7 @@
                         const order = await actions.order.capture();
                         console.log('订单已完成:', order);
                         
-                        // 清空购物车
+
                         cart = {};
                         localStorage.setItem('cart', JSON.stringify(cart));
                         updateCart();
@@ -556,9 +556,9 @@
             }).render('#paypal-button-container');
         }
 
-        // Initialize
+
         async function init() {
-            // await checkAuth();
+
             await getCsrfToken();
             loadCategories();
             loadProducts();

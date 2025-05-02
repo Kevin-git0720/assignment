@@ -107,7 +107,7 @@
         </form>
         <button id="showChangePasswordBtn" style="margin-top: 10px; background-color: #2196F3;">Change Password</button>
         
-        <!-- 添加修改密码表单 -->
+
         <form id="changePasswordForm" style="display: none; margin-top: 20px;">
             <h2 style="text-align: center; font-size: 1.5rem;">Change Password</h2>
             <div class="form-group">
@@ -141,7 +141,7 @@
         const API_BASE_URL = 'https://s29.iems5718.ie.cuhk.edu.hk/api';
         let csrfToken = '';
 
-        // Get CSRF token
+
         async function getCsrfToken() {
             try {
                 const response = await fetch(`${API_BASE_URL}/auth/csrf`, {
@@ -162,42 +162,42 @@
             }
         }
 
-        // Validate email format
+
         function validateEmail(email) {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             return emailRegex.test(email);
         }
 
-        // Validate password
+
         function validatePassword(password) {
             return password.length >= 6;
         }
 
-        // Show error message
+
         function showError(elementId, message) {
             const errorElement = document.getElementById(elementId);
             errorElement.textContent = message;
             errorElement.style.display = 'block';
         }
 
-        // Hide error message
+
         function hideError(elementId) {
             const errorElement = document.getElementById(elementId);
             errorElement.style.display = 'none';
         }
 
-        // Handle form submission
+
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             
-            // Reset error messages
+
             hideError('emailError');
             hideError('passwordError');
             
-            // Validate inputs
+
             let isValid = true;
             
             if (!validateEmail(email)) {
@@ -251,7 +251,7 @@
             }
         });
 
-        // Show/hide change password form
+
         document.getElementById('showChangePasswordBtn').addEventListener('click', () => {
             document.getElementById('loginForm').style.display = 'none';
             document.getElementById('showChangePasswordBtn').style.display = 'none';
@@ -269,7 +269,7 @@
             });
         });
 
-        // Handle change password form submission
+
         document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -278,12 +278,12 @@
             const newPassword = document.getElementById('newPassword').value;
             const confirmPassword = document.getElementById('confirmPassword').value;
             
-            // Reset error messages
+
             document.querySelectorAll('#changePasswordForm .error-message').forEach(el => {
                 el.style.display = 'none';
             });
             
-            // Validate inputs
+
             let isValid = true;
             
             if (!validateEmail(email)) {
@@ -311,7 +311,7 @@
             }
             
             try {
-                // 首先验证当前密码
+
                 const loginResponse = await fetch(`${API_BASE_URL}/auth/login`, {
                     method: 'POST',
                     credentials: 'include',
@@ -331,7 +331,7 @@
                     return;
                 }
 
-                // 如果当前密码验证成功，继续修改密码
+
                 const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
                     method: 'POST',
                     credentials: 'include',
@@ -365,7 +365,7 @@
             }
         });
 
-        // Initialize
+
         async function init() {
             await getCsrfToken();
         }
