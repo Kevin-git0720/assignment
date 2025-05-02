@@ -239,10 +239,16 @@
         }
 
         .preview-image {
-            max-width: 200px;
-            max-height: 200px;
+            max-width: 120px;
+            max-height: 120px;
             display: none;
             margin: 10px auto;
+            object-fit: contain;
+        }
+
+        .drop-zone-text {
+            margin: 10px 0;
+            color: #666;
         }
 
         .error-message {
@@ -303,8 +309,10 @@
                 <div class="form-group">
                     <label for="productImage">Image:</label>
                     <div class="drop-zone" id="dropZone">
-                        <p>Drag and drop image here</p>
-                        <p>or click to select image</p>
+                        <div class="drop-zone-text">
+                            <p>Drag and drop image here</p>
+                            <p>or click to select image</p>
+                        </div>
                         <input type="file" id="productImage" accept="image/*" style="display: none;">
                         <div class="preview-container">
                             <img id="previewImage" class="preview-image" alt="Preview">
@@ -919,21 +927,19 @@
             }
 
             function handleFile(file) {
-
                 if (!file.type.startsWith('image/')) {
                     showError('Please select an image file');
                     return;
                 }
-
 
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     previewImage.src = e.target.result;
                     previewImage.style.display = 'block';
                     errorMessage.style.display = 'none';
+                    document.querySelector('.drop-zone-text').style.display = 'none';
                 };
                 reader.readAsDataURL(file);
-
 
                 const dataTransfer = new DataTransfer();
                 dataTransfer.items.add(file);
@@ -944,6 +950,7 @@
                 errorMessage.textContent = message;
                 errorMessage.style.display = 'block';
                 previewImage.style.display = 'none';
+                document.querySelector('.drop-zone-text').style.display = 'block';
             }
         });
     </script>
