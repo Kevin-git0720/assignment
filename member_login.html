@@ -128,6 +128,10 @@
         <div class="tab-content" id="change-password">
             <form id="changePasswordForm">
                 <div class="form-group">
+                    <label for="changePasswordEmail">Email</label>
+                    <input type="email" id="changePasswordEmail" required>
+                </div>
+                <div class="form-group">
                     <label for="currentPassword">Current Password</label>
                     <input type="password" id="currentPassword" required>
                 </div>
@@ -279,6 +283,7 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
+                        email: document.getElementById('changePasswordEmail').value,
                         currentPassword: document.getElementById('currentPassword').value,
                         newPassword: newPassword
                     })

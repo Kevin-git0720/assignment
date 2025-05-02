@@ -324,20 +324,24 @@ app.post('/api/auth/logout', authenticateToken, async (req, res) => {
     }
 });
 
-app.post('/api/auth/change-password', authenticateToken, async (req, res) => {
-    const { currentPassword, newPassword } = req.body;
+app.post('/api/auth/change-password', async (req, res) => {
+    const { email, currentPassword, newPassword } = req.body;
     
     try {
         const [user] = await connection.promise().query(
-            'SELECT password, salt FROM users WHERE email = ?',
-            [req.user.email]
+            'SELECT userid, password, salt FROM users WHERE email = ?',
+            [email]
         );
+
+        if (!user || user.length === 0) {
+            return res.status(401).json({ message: '用户不存在' });
+        }
+
         const oldHashedPassword = hashPassword(currentPassword, user[0].salt);
         
-
         if (oldHashedPassword !== user[0].password) {
-          console.log('oldHashedPassword:', oldHashedPassword);
-          console.log('store password:', user[0].password);
+            console.log('oldHashedPassword:', oldHashedPassword);
+            console.log('store password:', user[0].password);
             return res.status(401).json({ message: '当前密码错误' });
         }
 
@@ -349,10 +353,9 @@ app.post('/api/auth/change-password', authenticateToken, async (req, res) => {
             [hashedPassword, newSalt, user[0].userid]
         );
 
-        // 清除会话
         await connection.promise().query(
             'UPDATE users SET session_id = NULL WHERE userid = ?',
-            [req.user.userid]
+            [user[0].userid]
         );
 
         res.clearCookie('token');

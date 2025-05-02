@@ -262,7 +262,6 @@
             document.getElementById('loginForm').style.display = 'block';
             document.getElementById('showChangePasswordBtn').style.display = 'block';
             document.getElementById('changePasswordForm').style.display = 'none';
-            // Clear form and errors
             document.getElementById('changePasswordForm').reset();
             document.querySelectorAll('#changePasswordForm .error-message').forEach(el => {
                 el.style.display = 'none';
@@ -349,7 +348,6 @@
                 
                 if (response.ok) {
                     alert('Password changed successfully. Please login with your new password.');
-                    // 清除所有 cookies
                     document.cookie.split(';').forEach(cookie => {
                         const [name] = cookie.split('=');
                         document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
