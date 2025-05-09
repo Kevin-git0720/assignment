@@ -455,17 +455,14 @@
             paypal.Buttons({
                 createOrder: async function(data, actions) {
                     try {
-                        console.log('开始创建PayPal订单...');
                         const items = Object.values(cart).filter(item => item && item.quantity > 0);
                         
                         if (items.length === 0) {
-                            console.log('购物车为空，无法创建订单');
                             alert('Your cart is empty');
                             return;
                         }
 
 
-                        console.log('发送订单验证请求...');
                         const response = await fetch(`${API_BASE_URL}/validate-order`, {
                             method: 'POST',
                             headers: {
@@ -486,7 +483,6 @@
                         }
 
                         const data = await response.json();
-                        console.log('订单验证成功:', data);
 
 
                         return actions.order.create({
@@ -500,15 +496,12 @@
                             }]
                         });
                     } catch (error) {
-                        console.error('创建订单时发生错误:', error);
                         alert('Failed to create order. Please try again.');
                     }
                 },
                 onApprove: async function(data, actions) {
                     try {
-                        console.log('PayPal订单已批准:', data);
                         const order = await actions.order.capture();
-                        console.log('订单已完成:', order);
                         
 
                         cart = {};
@@ -517,12 +510,11 @@
                         
                         alert('Payment completed successfully!');
                     } catch (error) {
-                        console.error('完成订单时发生错误:', error);
                         alert('Failed to complete payment. Please try again.');
                     }
                 },
                 onError: function(err) {
-                    console.error('PayPal错误:', err);
+                    console.error('PayPal error:', err);
                     alert('An error occurred during payment processing. Please try again.');
                 }
             }).render('#paypal-button-container');

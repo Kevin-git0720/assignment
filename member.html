@@ -162,7 +162,6 @@
                     return;
                 }
 
-                // 只显示最近的5个订单
                 const recentOrders = orders.slice(0, 5);
                 console.log('Recent orders:', recentOrders);
 
@@ -192,7 +191,6 @@
                     </div>
                 `).join('');
 
-                // 如果订单总数超过5个，显示提示信息
                 if (orders.length > 5) {
                     orderList.innerHTML += `
                         <div class="order-item">
@@ -233,12 +231,7 @@
                 
                 const data = await response.json();
                 console.log('Auth check successful, user data:', data);
-                
-                // if (!data.isAdmin) {
-                //     console.log('User is not admin, redirecting to index page...');
-                //     window.location.href = '/index.html';
-                //     return false;
-                // }
+            
                 
                 document.getElementById('userEmail').textContent = data.email;
                 return true;

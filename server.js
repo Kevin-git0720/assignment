@@ -226,6 +226,7 @@ app.post('/api/auth/login', validateInput, async (req, res) => {
         }
       
         const hashedPassword = hashPassword(password, user.salt);
+          
         
         console.log('Computed hashed password:', hashedPassword);
         console.log('Stored user password:', user.password);
@@ -602,7 +603,7 @@ app.get('/api/products', async (req, res) => {
         res.json(products);
     } catch (error) {
         console.error('Error fetching products:', error);
-        res.status(500).json({ message: '服务器错误' });
+        res.status(500).json({ message: 'Server error' });
     }
 });
 
@@ -750,7 +751,6 @@ app.post('/api/validate-order', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Invalid order items' });
         }
 
-        // 从JWT token中获取用户信息
         const userEmail = req.user.email || 'guest';
         const userId = req.user.id || null;
 
@@ -770,7 +770,7 @@ app.post('/api/validate-order', authenticateToken, async (req, res) => {
 
             const price = parseFloat(products[0].price);
             const quantity = parseInt(item.quantity);
-            const { finalPrice } = calculateDiscountedPrice(price, quantity, discounts);
+            const finalPrice = calculateDiscountedPrice(price, quantity, discounts);
             totalAmount += finalPrice;
 
             orderItems.push({

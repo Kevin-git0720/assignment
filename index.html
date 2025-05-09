@@ -374,57 +374,66 @@
         }
 
         async function updateCart() {
+            console.log('Updating cart display');
             const cartItems = document.getElementById('cartItems');
-            const cartTotal = document.getElementById('cartTotal');
-            let total = 0;
-            let html = '';
-
-            for (const pid in cart) {
-                const item = cart[pid];
-                if (item.quantity > 0) {
-                    const discounts = await fetch(`/api/discounts/${pid}`).then(r => r.json());
-                    const finalPrice = calculateDiscountedPrice(item.price, item.quantity, discounts);
-                    total += finalPrice;
-
-                    html += `
-                        <div class="cart-item" data-pid="${pid}">
-                            <div class="cart-item-details">
-                                <h4>${item.name}</h4>
-                                <div class="quantity-controls">
-                                    <button class="quantity-decrease">-</button>
-                                    <span>${item.quantity}</span>
-                                    <button class="quantity-increase">+</button>
-                                </div>                                
+            const items = Object.values(cart).filter(item => item && item.quantity > 0);
+            console.log('Cart items:', items);
+            
+            if (items.length === 0) {
+                cartItems.innerHTML = '<div class="empty-cart">Your cart is empty</div>';
+                document.getElementById('cartTotal').textContent = 'Total: $0.00';
+                document.getElementById('paypal-button-container').innerHTML = '';
+                localStorage.setItem('cart', JSON.stringify({}));
+                return;
+            }
+            
+            let cartTotal = 0;
+            let finalPrice = 0;
+            for (const item of items) {
+                const discounts = await fetch(`/api/discounts/${item.pid}`).then(r => r.json());
+                finalPrice = calculateDiscountedPrice(item.price, item.quantity, discounts);
+                cartTotal += finalPrice;
+            }
+            
+            cartItems.innerHTML = items.map(item => `
+                <div class="cart-item" data-pid="${item.pid}">
+                    <div class="cart-item-details">
+                        <h4>${escapeHTML(item.name)}</h4>
+                        <p>$${item.price}</p>
+                        <div class="quantity-controls">
+                            <button class="quantity-decrease">-</button>
+                            <span>${item.quantity}</span>
+                            <button class="quantity-increase">+</button>
+                        </div>
                                 <p>
                                     $${finalPrice.toFixed(2)}
                                     ${finalPrice < item.price * item.quantity ? 
                                         `<small>(原价: $${(item.price * item.quantity).toFixed(2)})</small>` : 
                                         ''}
-                                </p>
-                            </div>
-                        </div>
-                    `;
-                }
-            }
-
-            cartItems.innerHTML = html || '<div class="empty-cart">Your cart is empty</div>';
-            cartTotal.textContent = `Total: $${total.toFixed(2)}`;
-            localStorage.setItem('cart', JSON.stringify(cart));
-
-
-            document.querySelectorAll('.quantity-decrease').forEach(button => {
+                                </p>                        
+                    </div>
+                </div>
+            `).join('');
+            
+            // 添加事件监听器
+            cartItems.querySelectorAll('.quantity-decrease').forEach(button => {
                 button.addEventListener('click', (e) => {
                     const pid = e.target.closest('.cart-item').dataset.pid;
                     updateQuantity(pid, -1);
                 });
             });
             
-            document.querySelectorAll('.quantity-increase').forEach(button => {
+            cartItems.querySelectorAll('.quantity-increase').forEach(button => {
                 button.addEventListener('click', (e) => {
                     const pid = e.target.closest('.cart-item').dataset.pid;
                     updateQuantity(pid, 1);
                 });
             });
+            
+            const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            document.getElementById('cartTotal').textContent = `Total: $${total}`;
+            
+            localStorage.setItem('cart', JSON.stringify(cart));
         }
 
         function updateQuantity(pid, change) {
@@ -503,7 +512,9 @@
                             body: JSON.stringify({
                                 items: items.map(item => ({
                                     pid: item.pid,
-                                    quantity: item.quantity
+                                    quantity: item.quantity,
+                                    price: parseFloat(item.price),
+                                    name: item.name
                                 }))
                             })
                         });
@@ -513,13 +524,21 @@
                         }
 
                         const data = await response.json();
+                        console.log('订单验证响应:', data);
 
+                        // 计算总金额
+                        const totalAmount = items.reduce((sum, item) => {
+                            const itemTotal = parseFloat(item.price) * parseInt(item.quantity);
+                            return sum + (isNaN(itemTotal) ? 0 : itemTotal);
+                        }, 0).toFixed(2);
+
+                        console.log('订单总金额:', totalAmount);
 
                         return actions.order.create({
                             purchase_units: [{
                                 amount: {
                                     currency_code: "USD",
-                                    value: (items.reduce((sum, item) => sum + (item.price * item.quantity), 0)).toFixed(2)
+                                    value: totalAmount
                                 },
                                 custom_id: data.orderId,
                                 description: "Shopping Cart Purchase"
